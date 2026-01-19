@@ -9,13 +9,13 @@ import { useRouter } from "next/navigation";
 
 // Predefined users
 const ADMIN_USERS = {
-  "angel@gmail.com": "angel123",
+  "angel@gmail.com": "admin123",
 };
 
 const SUPER_ADMIN_USERS = {
-  "melba123@gmail.com": "admin123",
-  "herms123@gmail.com": "admin123",
-  "adrianne123@gmail.com": "admin123",
+  "melba123@gmail.com": "superadmin123",
+  "herms123@gmail.com": "superadmin123",
+  "adrianne123@gmail.com": "superadmin123",
 };
 
 export default function LoginPage() {
