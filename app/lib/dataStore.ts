@@ -16,7 +16,7 @@ export type VesselExperience = {
   vesselName: string;
   flag: string;
   vesselType: string;
-  grt: string;
+  grt: string;         // <-- ADD THIS
   engineMaker: string;
   trading: string;
   route: string;
@@ -26,6 +26,7 @@ export type VesselExperience = {
 };
 
 export interface CrewMember {
+  rank: any;
   id: string;
   createdAt: string;
 
@@ -103,7 +104,12 @@ export interface CrewMember {
   };
 
   vesselType: string;
-  status: "pending" | "approved" | "disapproved";
+
+  // ✅ UPDATED STATUS
+  status: "proposed" | "approved" | "disapproved";
+
+  // ✅ REMARKS ADDED
+  remarks: string;
 }
 
 class DataStore {

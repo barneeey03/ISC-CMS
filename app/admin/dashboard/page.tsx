@@ -106,7 +106,7 @@ export default function AdminDashboard() {
   );
 
   const approvedCount = filteredCrews.filter((c) => c.status === "approved").length;
-  const pendingCount = filteredCrews.filter((c) => c.status === "pending").length;
+  const pendingCount = filteredCrews.filter((c) => c.status === "proposed").length;
   const disapprovedCount = filteredCrews.filter((c) => c.status === "disapproved").length;
 
   const trendData = filteredCrews
@@ -382,7 +382,7 @@ export default function AdminDashboard() {
                             className={`px-2 py-1 rounded-full text-xs font-semibold ${
                               crew.status === "approved"
                                 ? "bg-green-500/20 text-green-300"
-                                : crew.status === "pending"
+                                : crew.status === "proposed"
                                 ? "bg-yellow-500/20 text-yellow-300"
                                 : "bg-red-500/20 text-red-300"
                             }`}

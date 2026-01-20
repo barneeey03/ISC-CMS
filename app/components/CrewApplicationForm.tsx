@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
 import { dataStore, Certificate, CrewMember, VesselExperience } from "@/app/lib/dataStore";
 
@@ -45,53 +45,58 @@ export function CrewApplicationForm({
   mode = "add",
   crew,
 }: CrewApplicationFormProps) {
-  const [formData, setFormData] = useState<CrewFormData>({
-    dateApplied: "",
-    presentRank: "",
-    prevSalary: "",
-    province: "",
-    dateOfAvailability: "",
-    expectedSalary: "",
-    placeOfBirth: "",
-    numOfChildren: "",
-    religion: "",
-    nextOfKin: "",
-    nextOfKinAddress: "",
-    schoolAttended: "",
-    weight: "",
-    course: "",
-    yearGraduated: "",
-    bmi: "",
-    ishihara: "",
+const [formData, setFormData] = useState<CrewFormData>({
+  dateApplied: "",
+  presentRank: "",
+  prevSalary: "",
+  province: "",
+  dateOfAvailability: "",
+  expectedSalary: "",
+  placeOfBirth: "",
+  numOfChildren: "",
+  religion: "",
+  nextOfKin: "",
+  nextOfKinAddress: "",
+  schoolAttended: "",
+  weight: "",
+  course: "",
+  yearGraduated: "",
+  bmi: "",
+  ishihara: "",
 
-    certificates: [],
-    vesselExperience: [],
+  certificates: [],
+  vesselExperience: [],
 
-    fullName: "",
-    fathersName: "",
-    mothersName: "",
-    dateOfBirth: "",
-    age: "",
-    nationality: "",
-    gender: "",
-    height: "",
-    uniformSize: "",
-    civilStatus: "",
+  fullName: "",
+  fathersName: "",
+  mothersName: "",
+  dateOfBirth: "",
+  age: "",
+  nationality: "",
+  gender: "",
+  height: "",
+  uniformSize: "",
+  civilStatus: "",
 
-    mobileNumber: "",
-    emailAddress: "",
-    completeAddress: "",
+  mobileNumber: "",
+  emailAddress: "",
+  completeAddress: "",
 
-    highSchool: { schoolName: "", yearGraduated: "" },
-    college: { schoolName: "", course: "", yearGraduated: "" },
+  highSchool: { schoolName: "", yearGraduated: "" },
+  college: { schoolName: "", course: "", yearGraduated: "" },
 
-    documents: [],
-    seaService: [],
-    medical: { certificateType: "", issuingClinic: "", dateIssued: "", expiryDate: "" },
+  documents: [],
+  seaService: [],
+  medical: { certificateType: "", issuingClinic: "", dateIssued: "", expiryDate: "" },
 
-    vesselType: "",
-    status: "pending",
-  });
+  vesselType: "",
+  status: "proposed",
+
+  // ⚠️ ADD THIS:
+  rank: "",
+
+  remarks: "",
+});
 
   useEffect(() => {
     if (mode === "edit" && crew) {
@@ -113,30 +118,30 @@ export function CrewApplicationForm({
     return String(age);
   };
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
+ const handleInputChange = (
+  e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+) => {
+  const { name, value } = e.target;
 
-    if (name === "dateOfBirth") {
-      setFormData((prev) => ({
-        ...prev,
-        dateOfBirth: value,
-        age: calculateAge(value),
-      }));
-      return;
-    }
+  if (name === "dateOfBirth") {
+    setFormData((prev) => ({
+      ...prev,
+      dateOfBirth: value,
+      age: calculateAge(value),
+    }));
+    return;
+  }
 
-    if (name.includes(".")) {
-      const [parent, child] = name.split(".");
-      setFormData((prev) => ({
-        ...prev,
-        [parent]: { ...(prev as any)[parent], [child]: value },
-      }));
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
-    }
-  };
+  if (name.includes(".")) {
+    const [parent, child] = name.split(".");
+    setFormData((prev) => ({
+      ...prev,
+      [parent]: { ...(prev as any)[parent], [child]: value },
+    }));
+  } else {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  }
+};
 
   const addCertificate = () => {
     setFormData((prev) => ({
@@ -684,6 +689,20 @@ export function CrewApplicationForm({
                 </div>
               ))}
             </div>
+          </section>
+
+          {/* ✅ REMARKS SECTION ADDED */}
+          <section className="border border-[#E0E8F0] rounded-xl p-6">
+            <h3 className="text-lg font-bold text-[#0080C0] mb-5">
+              Remarks
+            </h3>
+            <textarea
+              name="remarks"
+              value={formData.remarks}
+              onChange={handleInputChange}
+              className={`${inputStyle} min-h-30 resize-none`}
+              placeholder="Add remarks here..."
+            />
           </section>
 
           {/* ACTIONS */}

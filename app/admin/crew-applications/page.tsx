@@ -5,9 +5,18 @@ import { AdminSidebar } from "@/app/components/AdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 import { CrewApplicationForm } from "@/app/components/CrewApplicationForm";
 import { CrewDetailsModal } from "@/app/components/CrewDetailsModal";
-import { dataStore } from "@/app/lib/dataStore";
-import { CrewMember } from "@/app/lib/type";
-import { Plus, Eye, Edit2, Trash2, Download, Search } from "lucide-react";
+import { dataStore, CrewMember } from "@/app/lib/dataStore";
+
+import {
+  Plus,
+  Eye,
+  Edit2,
+  Trash2,
+  Download,
+  Search,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
 import jsPDF from "jspdf";
 
 export default function CrewApplications() {
@@ -20,7 +29,7 @@ export default function CrewApplications() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<
-    "all" | "pending" | "approved" | "disapproved"
+    "all" | "proposed" | "approved" | "disapproved"
   >("all");
 
   const [page, setPage] = useState(1);
@@ -65,8 +74,7 @@ export default function CrewApplications() {
       return (
         crew.fullName.toLowerCase().includes(q) ||
         crew.emailAddress.toLowerCase().includes(q) ||
-        crew.mobileNumber.includes(q) ||
-        crew.gender.toLowerCase().includes(q)
+        crew.mobileNumber.includes(q)
       );
     });
 
@@ -93,14 +101,14 @@ export default function CrewApplications() {
     paginatedCrews.forEach((crew, index) => {
       doc.setFontSize(11);
       doc.text(`${index + 1}. ${crew.fullName}`, 14, y);
-      doc.text(`Email: ${crew.emailAddress}`, 14, y + 6);
-      doc.text(`Gender: ${crew.gender}`, 14, y + 12);
-      doc.text(`Contact #: ${crew.mobileNumber}`, 14, y + 18);
-      doc.text(`DOB: ${crew.dateOfBirth}`, 14, y + 24);
-      doc.text(`Age: ${getAge(crew.dateOfBirth)}`, 14, y + 30);
-      doc.text(`Status: ${crew.status.toUpperCase()}`, 14, y + 36);
+      doc.text(`Rank: ${crew.presentRank}`, 14, y + 6);
+      doc.text(`Vessel Type: ${crew.vesselType}`, 14, y + 12);
+      doc.text(`Age: ${getAge(crew.dateOfBirth)}`, 14, y + 18);
+      doc.text(`Email: ${crew.emailAddress}`, 14, y + 24);
+      doc.text(`Status: ${crew.status.toUpperCase()}`, 14, y + 30);
+      doc.text(`Remarks: ${crew.remarks || "—"}`, 14, y + 36);
 
-      y += 45;
+      y += 50;
       if (y > 270) {
         doc.addPage();
         y = 20;
@@ -134,7 +142,7 @@ export default function CrewApplications() {
                 <Search className="w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search name, email, contact, gender..."
+                  placeholder="Search name, email, contact..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full outline-none text-sm text-gray-700"
@@ -149,13 +157,13 @@ export default function CrewApplications() {
                   className="w-full outline-none text-sm text-gray-700"
                 >
                   <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
+                  <option value="proposed">Proposed</option>
                   <option value="approved">Approved</option>
                   <option value="disapproved">Disapproved</option>
                 </select>
               </div>
 
-              {/* BUTTONS AT RIGHT */}
+              {/* BUTTONS */}
               <div className="flex items-center justify-end gap-2 md:col-span-2">
                 <button
                   onClick={exportPDF}
@@ -175,68 +183,79 @@ export default function CrewApplications() {
               </div>
             </div>
 
-            {/* TABLE */}
-            <div className="overflow-x-auto bg-white rounded-xl shadow border">
-              <table className="min-w-full divide-y">
-                <thead className="bg-blue-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Email</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Gender</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Age</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Contact #</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">DOB</th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Status</th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Actions</th>
-                  </tr>
-                </thead>
+      {/* TABLE */}
+      <div className="overflow-x-auto bg-white rounded-xl shadow border">
+        <table className="min-w-full divide-y">
+          <thead className="bg-blue-200">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Rank</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Name</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Vessel Type</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Age</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Email</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Remarks</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Action</th>
+            </tr>
+          </thead>
 
-                <tbody className="divide-y bg-white">
-                  {paginatedCrews.map((crew) => (
-                    <tr key={crew.id} className="hover:bg-blue-50">
-                      <td className="px-6 py-4 font-medium text-gray-800">{crew.fullName}</td>
-                      <td className="px-6 py-4 text-gray-600">{crew.emailAddress}</td>
-                      <td className="px-6 py-4 capitalize text-gray-600">{crew.gender}</td>
-                      <td className="px-6 py-4 text-gray-600">{getAge(crew.dateOfBirth)}</td>
-                      <td className="px-6 py-4 text-gray-600">{crew.mobileNumber}</td>
-                      <td className="px-6 py-4 text-gray-600">{crew.dateOfBirth}</td>
+          <tbody className="divide-y bg-white">
+            {paginatedCrews.map((crew) => (
+              <tr key={crew.id} className="hover:bg-blue-50">
+                <td className="px-6 py-4 text-gray-600">{crew.presentRank}</td>
+                <td className="px-6 py-4 font-medium text-gray-800">{crew.fullName}</td>
+                <td className="px-6 py-4 text-gray-600">{crew.vesselType}</td>
+                <td className="px-6 py-4 text-gray-600">{getAge(crew.dateOfBirth)}</td>
+                <td className="px-6 py-4 text-gray-600">{crew.emailAddress}</td>
 
-                      <td className="px-6 py-4 text-center">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold
-                          ${crew.status === "approved"
-                            ? "bg-green-100 text-green-700"
-                            : crew.status === "pending"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-red-100 text-red-700"}`}>
-                          {crew.status.toUpperCase()}
-                        </span>
-                      </td>
+                <td className="px-6 py-4 text-center">
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-semibold
+                    ${crew.status === "approved"
+                      ? "bg-green-100 text-green-700"
+                      : crew.status === "proposed"
+                      ? "bg-yellow-100 text-yellow-700"
+                      : "bg-red-100 text-red-700"}`}
+                  >
+                    {crew.status.toUpperCase()}
+                  </span>
+                </td>
 
-                      <td className="px-6 py-4 flex justify-center gap-3">
-                        <button
-                          onClick={() => setSelectedCrew(crew)}
-                          className="p-2 rounded-lg hover:bg-gray-100"
-                        >
-                          <Eye className="w-4 h-4 text-blue-600" />
-                        </button>
-                        <button
-                          onClick={() => handleEdit(crew)}
-                          className="p-2 rounded-lg hover:bg-gray-100"
-                        >
-                          <Edit2 className="w-4 h-4 text-green-600" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(crew.id)}
-                          className="p-2 rounded-lg hover:bg-gray-100"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-600" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                {/* REMARKS COLUMN */}
+                <td className="px-6 py-4 text-gray-600">
+                  {crew.remarks || "No remarks"}
+                </td>
+
+                {/* ACTION COLUMN */}
+                <td className="px-6 py-4">
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => setSelectedCrew(crew)}
+                      className="px-3 py-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200"
+                    >
+                      View
+                    </button>
+
+                    <button
+                      onClick={() => handleEdit(crew)}
+                      className="px-3 py-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200"
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      onClick={() => handleDelete(crew.id)}
+                      className="px-3 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
             {/* PAGINATION */}
             <div className="flex justify-between items-center mt-6">
