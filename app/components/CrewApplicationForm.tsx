@@ -1,17 +1,22 @@
 "use client";
 
-import React from "react"
-
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { dataStore, CrewMember } from "@/app/lib/dataStore";
 import { X } from "lucide-react";
 
 interface CrewApplicationFormProps {
   onClose: () => void;
   onSuccess: () => void;
+  mode?: "add" | "edit";
+  crew?: CrewMember;
 }
 
-export function CrewApplicationForm({ onClose, onSuccess }: CrewApplicationFormProps) {
+export function CrewApplicationForm({
+  onClose,
+  onSuccess,
+  mode = "add",
+  crew,
+}: CrewApplicationFormProps) {
   const [formData, setFormData] = useState({
     fullName: "",
     fathersName: "",
@@ -30,13 +35,36 @@ export function CrewApplicationForm({ onClose, onSuccess }: CrewApplicationFormP
     vesselType: "",
   });
 
+  /* ✅ PREFILL WHEN EDITING */
+  useEffect(() => {
+    if (mode === "edit" && crew) {
+      setFormData({
+        fullName: crew.fullName,
+        fathersName: crew.fathersName,
+        mothersName: crew.mothersName,
+        dateOfBirth: crew.dateOfBirth,
+        nationality: crew.nationality,
+        gender: crew.gender,
+        height: crew.height,
+        uniformSize: crew.uniformSize,
+        civilStatus: crew.civilStatus,
+        mobileNumber: crew.mobileNumber,
+        emailAddress: crew.emailAddress,
+        completeAddress: crew.completeAddress,
+        highSchool: crew.highSchool,
+        college: crew.college,
+        vesselType: crew.vesselType,
+      });
+    }
+  }, [mode, crew]);
+
   const calculateAge = (dob: string) => {
     if (!dob) return 0;
     const birthDate = new Date(dob);
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
     return age;
@@ -44,24 +72,39 @@ export function CrewApplicationForm({ onClose, onSuccess }: CrewApplicationFormP
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const newCrew: Omit<CrewMember, "id" | "createdAt"> = {
-      ...formData,
-      age: calculateAge(formData.dateOfBirth),
-      documents: [],
-      seaService: [],
-      medical: { certificateType: "", issuingClinic: "", dateIssued: "", expiryDate: "" },
-      status: "pending",
-    };
 
-    dataStore.addCrew(newCrew);
+    if (mode === "edit" && crew) {
+      dataStore.updateCrew(crew.id, {
+        ...formData,
+        age: calculateAge(formData.dateOfBirth),
+      });
+    } else {
+      const newCrew: Omit<CrewMember, "id" | "createdAt"> = {
+        ...formData,
+        age: calculateAge(formData.dateOfBirth),
+        documents: [],
+        seaService: [],
+        medical: {
+          certificateType: "",
+          issuingClinic: "",
+          dateIssued: "",
+          expiryDate: "",
+        },
+        status: "pending",
+      };
+
+      dataStore.addCrew(newCrew);
+    }
+
     onSuccess();
     onClose();
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
-    
+
     if (name.includes(".")) {
       const [parent, child] = name.split(".");
       setFormData((prev) => ({
@@ -69,24 +112,20 @@ export function CrewApplicationForm({ onClose, onSuccess }: CrewApplicationFormP
         [parent]: { ...(prev as any)[parent], [child]: value },
       }));
     } else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
+      setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
+        {/* HEADER */}
         <div className="sticky top-0 flex items-center justify-between p-6 border-b border-[#E0E8F0] bg-white">
-          <h2 className="text-2xl font-extrabold text-[#002060]">Add New Crew Member</h2>
-          <button
-            onClick={onClose}
-            className="text-[#80A0C0] hover:text-[#002060] transition-colors"
-          >
-            <X className="w-6 h-6" />
+          <h2 className="text-2xl font-extrabold text-[#002060]">
+            {mode === "edit" ? "Edit Crew Member" : "Add New Crew Member"}
+          </h2>
+          <button onClick={onClose}>
+            <X className="w-6 h-6 text-[#80A0C0] hover:text-[#002060]" />
           </button>
         </div>
 
