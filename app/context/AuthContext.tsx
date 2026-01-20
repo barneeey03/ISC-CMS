@@ -7,48 +7,84 @@ interface AuthContextType {
   email: string | null;
   role: "admin" | "super-admin" | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (email: string, role: "admin" | "super-admin") => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [auth, setAuth] = useState<AuthContextType>({
-    email: null,
-    role: null,
-    isAuthenticated: false,
-    logout: () => {},
-  });
-  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const storedAuth = localStorage.getItem("auth");
-    if (storedAuth) {
-      const parsedAuth = JSON.parse(storedAuth);
-      setAuth((prev) => ({
-        ...prev,
-        ...parsedAuth,
-      }));
-    }
-    setIsLoading(false);
-  }, []);
+  const login = (email: string, role: "admin" | "super-admin") => {
+    const authData = { email, role, isAuthenticated: true };
+    localStorage.setItem("auth", JSON.stringify(authData));
+
+    setAuth({
+      email,
+      role,
+      isAuthenticated: true,
+      isLoading: false,
+      login,
+      logout,
+    });
+
+    setIsLoading(false); // ✅ IMPORTANT
+  };
 
   const logout = () => {
     localStorage.removeItem("auth");
+
     setAuth({
       email: null,
       role: null,
       isAuthenticated: false,
+      isLoading: false,
+      login,
       logout,
     });
+
+    setIsLoading(false); // ✅ IMPORTANT
     router.push("/");
   };
 
-  const value: AuthContextType = {
-    ...auth,
+  const [auth, setAuth] = useState<AuthContextType>({
+    email: null,
+    role: null,
+    isAuthenticated: false,
+    isLoading: true,
+    login,
     logout,
-  };
+  });
+
+  useEffect(() => {
+    const storedAuth = localStorage.getItem("auth");
+
+    if (storedAuth) {
+      const parsedAuth = JSON.parse(storedAuth);
+      setAuth({
+        email: parsedAuth.email || null,
+        role: parsedAuth.role || null,
+        isAuthenticated: parsedAuth.isAuthenticated || false,
+        isLoading: false,
+        login,
+        logout,
+      });
+    } else {
+      setAuth({
+        email: null,
+        role: null,
+        isAuthenticated: false,
+        isLoading: false,
+        login,
+        logout,
+      });
+    }
+
+    setIsLoading(false); // ✅ IMPORTANT
+  }, []);
 
   if (isLoading) {
     return (
@@ -61,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
