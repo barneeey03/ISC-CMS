@@ -12,7 +12,7 @@ export function AdminSidebar() {
   const isActive = (path: string) => pathname === path;
 
   return (
-    <div className="w-64 bg-accent text-white min-h-screen flex flex-col shadow-lg">
+    <div className="w-64 h-screen fixed left-0 top-0 bg-accent text-white flex flex-col shadow-lg">
       {/* Header */}
       <div className="p-6 border-b border-primary/30">
         <h2 className="text-xl font-extrabold text-white">Admin Panel</h2>
@@ -20,7 +20,7 @@ export function AdminSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         <Link
           href="/admin/dashboard"
           className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
