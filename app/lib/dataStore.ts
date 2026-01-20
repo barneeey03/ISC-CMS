@@ -1,7 +1,55 @@
-// In-memory data store
+// app/lib/dataStore.ts
+
+export type Certificate = {
+  id: string;
+  name: string;
+  number: string;
+  dateIssued: string;
+  validUntil: string;
+};
+
+export type VesselExperience = {
+  id: string;
+  manningCompany: string;
+  principal: string;
+  rank: string;
+  vesselName: string;
+  flag: string;
+  vesselType: string;
+  grt: string;
+  engineMaker: string;
+  trading: string;
+  route: string;
+  signedOn: string;
+  signedOff: string;
+  causeOfDischarge: string;
+};
+
 export interface CrewMember {
   id: string;
-  // Profile
+  createdAt: string;
+
+  dateApplied: string;
+  presentRank: string;
+  prevSalary: string;
+  province: string;
+  dateOfAvailability: string;
+  expectedSalary: string;
+  placeOfBirth: string;
+  numOfChildren: string;
+  religion: string;
+  nextOfKin: string;
+  nextOfKinAddress: string;
+  schoolAttended: string;
+  weight: string;
+  course: string;
+  yearGraduated: string;
+  bmi: string;
+  ishihara: string;
+
+  certificates: Certificate[];
+  vesselExperience: VesselExperience[];
+
   fullName: string;
   fathersName: string;
   mothersName: string;
@@ -12,21 +60,22 @@ export interface CrewMember {
   height: string;
   uniformSize: string;
   civilStatus: string;
-  // Contact & Address
+
   mobileNumber: string;
   emailAddress: string;
   completeAddress: string;
-  // Education
+
   highSchool: {
     schoolName: string;
     yearGraduated: string;
   };
+
   college: {
     schoolName: string;
     course: string;
     yearGraduated: string;
   };
-  // Documents
+
   documents: {
     id: string;
     name: string;
@@ -34,7 +83,7 @@ export interface CrewMember {
     dateIssued: string;
     expiryDate: string;
   }[];
-  // Sea Service
+
   seaService: {
     id: string;
     rankServed: string;
@@ -45,17 +94,16 @@ export interface CrewMember {
     dateDisembarked: string;
     duration: string;
   }[];
-  // Medical
+
   medical: {
     certificateType: string;
     issuingClinic: string;
     dateIssued: string;
     expiryDate: string;
   };
+
   vesselType: string;
-  // Status
   status: "pending" | "approved" | "disapproved";
-  createdAt: string;
 }
 
 class DataStore {
@@ -81,10 +129,6 @@ class DataStore {
     return Array.from(this.crews.values());
   }
 
-  getCrewsByStatus(status: CrewMember["status"]): CrewMember[] {
-    return Array.from(this.crews.values()).filter((crew) => crew.status === status);
-  }
-
   updateCrew(id: string, updates: Partial<CrewMember>): CrewMember | undefined {
     const crew = this.crews.get(id);
     if (crew) {
@@ -100,5 +144,4 @@ class DataStore {
   }
 }
 
-// Singleton instance
 export const dataStore = new DataStore();
