@@ -29,20 +29,30 @@ export default function DisapprovedCrew() {
     <ProtectedRoute requiredRole="admin">
       <div className="flex">
         <AdminSidebar />
-        <div className="flex-1 bg-[#F5F9FC] min-h-screen">
-          {/* Header */}
-          <div className="bg-white border-b border-[#E0E8F0] p-6">
-            <h1 className="text-3xl font-extrabold text-[#002060]">Disapproved Crew</h1>
-            <p className="text-[#80A0C0] mt-1">{disapprovedCrews.length} disapproved applications</p>
+
+        {/* MAIN CONTENT */}
+        <div className="flex-1 bg-[#F5F9FC] min-h-screen lg:ml-64">
+          {/* HEADER */}
+          <div className="fixed top-0 left-0 right-0 z-20 lg:ml-64 bg-white border-b border-[#E0E8F0] p-6">
+            <h1 className="text-3xl font-extrabold text-[#002060]">
+              Disapproved Crew
+            </h1>
+            <p className="text-[#80A0C0] mt-1">
+              {disapprovedCrews.length} disapproved applications
+            </p>
           </div>
 
-          {/* Content */}
-          <div className="p-6">
+          {/* CONTENT */}
+          <div className="pt-28 px-6 pb-10">
             {disapprovedCrews.length === 0 ? (
               <div className="bg-white rounded-lg shadow-md p-12 text-center">
                 <FileText className="w-16 h-16 text-[#80A0C0] opacity-30 mx-auto mb-4" />
-                <h3 className="text-xl font-bold text-[#002060] mb-2">No Disapproved Applications</h3>
-                <p className="text-[#80A0C0]">There are no disapproved crew members at the moment.</p>
+                <h3 className="text-xl font-bold text-[#002060] mb-2">
+                  No Disapproved Applications
+                </h3>
+                <p className="text-[#80A0C0]">
+                  There are no disapproved crew members at the moment.
+                </p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -53,35 +63,63 @@ export default function DisapprovedCrew() {
                   >
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                       <div>
-                        <p className="text-xs font-semibold text-[#80A0C0]">Full Name</p>
-                        <p className="text-lg font-bold text-[#002060]">{crew.fullName}</p>
+                        <p className="text-xs font-semibold text-[#80A0C0]">
+                          Full Name
+                        </p>
+                        <p className="text-lg font-bold text-[#002060]">
+                          {crew.fullName}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-[#80A0C0]">Email</p>
-                        <p className="text-sm text-[#002060]">{crew.emailAddress}</p>
+                        <p className="text-xs font-semibold text-[#80A0C0]">
+                          Email
+                        </p>
+                        <p className="text-sm text-[#002060]">
+                          {crew.emailAddress}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-[#80A0C0]">Age</p>
-                        <p className="text-lg font-bold text-[#002060]">{crew.age} years</p>
+                        <p className="text-xs font-semibold text-[#80A0C0]">
+                          Age
+                        </p>
+                        <p className="text-lg font-bold text-[#002060]">
+                          {crew.age} years
+                        </p>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-[#80A0C0]">Nationality</p>
-                        <p className="text-sm text-[#002060]">{crew.nationality}</p>
+                        <p className="text-xs font-semibold text-[#80A0C0]">
+                          Nationality
+                        </p>
+                        <p className="text-sm text-[#002060]">
+                          {crew.nationality}
+                        </p>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 pb-4 border-b border-[#E0E8F0]">
                       <div>
-                        <p className="text-xs font-semibold text-[#80A0C0]">Mobile</p>
-                        <p className="text-sm text-[#002060]">{crew.mobileNumber}</p>
+                        <p className="text-xs font-semibold text-[#80A0C0]">
+                          Mobile
+                        </p>
+                        <p className="text-sm text-[#002060]">
+                          {crew.mobileNumber}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-[#80A0C0]">Address</p>
-                        <p className="text-sm text-[#002060] line-clamp-1">{crew.completeAddress}</p>
+                        <p className="text-xs font-semibold text-[#80A0C0]">
+                          Address
+                        </p>
+                        <p className="text-sm text-[#002060] line-clamp-1">
+                          {crew.completeAddress}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-[#80A0C0]">Civil Status</p>
-                        <p className="text-sm text-[#002060]">{crew.civilStatus}</p>
+                        <p className="text-xs font-semibold text-[#80A0C0]">
+                          Civil Status
+                        </p>
+                        <p className="text-sm text-[#002060]">
+                          {crew.civilStatus}
+                        </p>
                       </div>
                     </div>
 
