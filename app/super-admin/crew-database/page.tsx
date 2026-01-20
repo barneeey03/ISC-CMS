@@ -5,14 +5,13 @@ import { SuperAdminSidebar } from "@/app/components/SuperAdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 import { dataStore } from "@/app/lib/dataStore";
 import { FileText, Search, Filter } from "lucide-react";
-import { useSearchParams, Suspense } from "next/navigation";
+import React, { Suspense } from "react";
 import Loading from "./loading";
 
 export default function CrewDatabase() {
   const [crews, setCrews] = useState(dataStore.getAllCrews());
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "approved" | "pending" | "disapproved">("approved");
-  const searchParams = useSearchParams();
 
   const filteredCrews = crews.filter((crew) => {
     const matchesSearch =
