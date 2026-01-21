@@ -10,12 +10,14 @@ export function CrewDetailsModal({
   onApprove,
   onDisapprove,
   onProposed,
+  onFooled,          // <-- ADD THIS
 }: {
   crew: CrewMember;
   onClose: () => void;
   onApprove: (id: string) => void;
   onDisapprove: (id: string, reconsider?: boolean) => void;
   onProposed: (id: string) => void;
+  onFooled: (id: string) => void;   // <-- ADD THIS
 }) {
 
   const [openSection, setOpenSection] = useState<string | null>("basic");
@@ -36,7 +38,7 @@ export function CrewDetailsModal({
         </div>
 
         <div className="p-6 space-y-6">
-          
+
           {/* ACTION BUTTONS */}
           <div className="flex gap-3 mt-4 justify-end">
             <button
@@ -71,7 +73,7 @@ export function CrewDetailsModal({
                   onClick={() => onDisapprove(crew.id, true)}
                   className="px-4 py-2 rounded-lg bg-yellow-400 text-white font-semibold"
                 >
-                  Yes (Pulled)
+                  Yes (Fooled)
                 </button>
                 <button
                   onClick={() => onDisapprove(crew.id, false)}
@@ -82,7 +84,7 @@ export function CrewDetailsModal({
               </div>
             </div>
           )}
-          
+
           {/* ====== DETAILS SECTIONS ====== */}
           <Section
             title="Basic Information"

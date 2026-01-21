@@ -31,6 +31,7 @@ import {
 import React from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { CrewMember } from "@/app/lib/type";
 
 const THEME_COLORS = {
   green: "#10B981",
@@ -40,49 +41,45 @@ const THEME_COLORS = {
   purple: "#8B5CF6",
 };
 
-type CrewStatus = "all" | "approved" | "pending" | "disapproved";
+type CrewStatus = "all" | "approved" | "pending" | "disapproved" | "fooled";
 
 export default function AdminDashboard() {
   const { email } = useAuth();
   const allCrews = dataStore.getAllCrews();
 
-  // REAL-TIME UPDATES (Polling)
   const [realtimeTrigger, setRealtimeTrigger] = React.useState(0);
   React.useEffect(() => {
     const interval = setInterval(() => {
       setRealtimeTrigger((prev) => prev + 1);
-    }, 2000); // every 2 seconds
+    }, 2000);
     return () => clearInterval(interval);
   }, []);
 
-  // Filters
   const [statusFilter, setStatusFilter] = React.useState<CrewStatus>("all");
   const [startDate, setStartDate] = React.useState<string>("");
   const [endDate, setEndDate] = React.useState<string>("");
-
-  // Search
   const [searchQuery, setSearchQuery] = React.useState("");
 
-  // Sorting
   const [sortBy, setSortBy] = React.useState<"name" | "status" | "date">("date");
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc");
 
-  // Pagination
   const [currentPage, setCurrentPage] = React.useState(1);
   const ITEMS_PER_PAGE = 10;
 
-  // Modal
   const [selectedCrew, setSelectedCrew] = React.useState<any>(null);
 
   const filteredCrews = allCrews
-    .filter((crew) => (statusFilter === "all" ? true : crew.status === statusFilter))
+    .filter((crew) => {
+      if (statusFilter === "all") return true;
+      if (statusFilter === "pending") return crew.status === "proposed";
+      if (statusFilter === "fooled") return crew.status === "fooled";
+      return crew.status === statusFilter;
+    })
     .filter((crew) => {
       if (!startDate && !endDate) return true;
-
       const created = new Date(crew.createdAt).getTime();
       const start = startDate ? new Date(startDate).getTime() : -Infinity;
       const end = endDate ? new Date(endDate).getTime() : Infinity;
-
       return created >= start && created <= end;
     })
     .filter((crew) => {
@@ -93,12 +90,9 @@ export default function AdminDashboard() {
       const dir = sortDir === "asc" ? 1 : -1;
       if (sortBy === "name") return a.fullName.localeCompare(b.fullName) * dir;
       if (sortBy === "status") return a.status.localeCompare(b.status) * dir;
-      return (
-        (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir
-      );
+      return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir;
     });
 
-  // Pagination logic
   const totalPages = Math.ceil(filteredCrews.length / ITEMS_PER_PAGE);
   const paginatedCrews = filteredCrews.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -108,6 +102,7 @@ export default function AdminDashboard() {
   const approvedCount = filteredCrews.filter((c) => c.status === "approved").length;
   const pendingCount = filteredCrews.filter((c) => c.status === "proposed").length;
   const disapprovedCount = filteredCrews.filter((c) => c.status === "disapproved").length;
+  const fooledCount = filteredCrews.filter((c) => c.status === "fooled").length;
 
   const trendData = filteredCrews
     .map((crew) => ({ date: new Date(crew.createdAt).toLocaleDateString() }))
@@ -123,11 +118,16 @@ export default function AdminDashboard() {
     { name: "Approved", value: approvedCount },
     { name: "Pending", value: pendingCount },
     { name: "Disapproved", value: disapprovedCount },
+    { name: "Fooled", value: fooledCount },
   ];
 
-  const COLORS = [THEME_COLORS.blue, THEME_COLORS.amber, THEME_COLORS.red];
+  const COLORS = [
+    THEME_COLORS.blue,
+    THEME_COLORS.amber,
+    THEME_COLORS.red,
+    THEME_COLORS.purple,
+  ];
 
-  // PDF Export
   const exportPDF = () => {
     const doc = new jsPDF("landscape");
     doc.setFontSize(16);
@@ -151,13 +151,19 @@ export default function AdminDashboard() {
     doc.save("crew_report.pdf");
   };
 
+  const updateStatus = (crewId: string, status: CrewMember["status"]) => {
+    dataStore.updateCrewStatus(crewId, status);
+    setSelectedCrew(null);
+    setRealtimeTrigger((prev) => prev + 1);
+  };
+
   return (
     <ProtectedRoute requiredRole="admin">
       <div className="flex">
         <AdminSidebar />
 
-        <div className="flex-1 min-h-screen lg:ml-64 bg-[#ffffff]">
-          <div className="fixed top-0 left-0 right-0 z-20 lg:ml-64 bg-[#ffffff] border-b border-[#374151]">
+        <div className="flex-1 min-h-screen lg:ml-64 bg-[#f7f7ff]">
+          <div className="fixed top-0 left-0 right-0 z-20 lg:ml-64 bg-white border-b border-[#e5e7eb]">
             <div className="flex items-center justify-between px-6 py-4">
               <div className="flex items-center gap-3">
                 <Activity className="w-5 h-5 text-black/80" />
@@ -171,14 +177,14 @@ export default function AdminDashboard() {
 
           <div className="pt-20 px-6 pb-10">
             {/* Filters */}
-            <div className="bg-[#ffffff] rounded-lg shadow-md p-6 border border-[#374151] mb-8">
+            <div className="bg-white rounded-2xl shadow-sm p-6 border border-[#e5e7eb] mb-8">
               <h2 className="text-black font-bold mb-4">Filters</h2>
 
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div>
-                  <label className="text-black /70 text-sm">Status</label>
+                  <label className="text-black/70 text-sm">Status</label>
                   <select
-                    className="w-full mt-2 bg-[#ffffff] border border-[#374151] rounded-lg p-3 text-black"
+                    className="w-full mt-2 bg-white border border-[#e5e7eb] rounded-xl p-3 text-black"
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value as any)}
                   >
@@ -186,6 +192,7 @@ export default function AdminDashboard() {
                     <option value="approved">Approved</option>
                     <option value="pending">Pending</option>
                     <option value="disapproved">Disapproved</option>
+                    <option value="fooled">Fooled</option>
                   </select>
                 </div>
 
@@ -193,7 +200,7 @@ export default function AdminDashboard() {
                   <label className="text-black/70 text-sm">Start Date</label>
                   <input
                     type="date"
-                    className="w-full mt-2 bg-[#ffffff] border border-[#374151] rounded-lg p-3 text-black"
+                    className="w-full mt-2 bg-white border border-[#e5e7eb] rounded-xl p-3 text-black"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
                   />
@@ -203,7 +210,7 @@ export default function AdminDashboard() {
                   <label className="text-black/70 text-sm">End Date</label>
                   <input
                     type="date"
-                    className="w-full mt-2 bg-[#ffffff] border border-[#374151] rounded-lg p-3 text-black"
+                    className="w-full mt-2 bg-white border border-[#e5e7eb] rounded-xl p-3 text-black"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                   />
@@ -214,7 +221,7 @@ export default function AdminDashboard() {
                   <div className="relative mt-2">
                     <Search className="absolute top-3 left-3 text-black/60" />
                     <input
-                      className="w-full pl-10 bg-[#ffffff] border border-[#374151] rounded-lg p-3 text-black"
+                      className="w-full pl-10 bg-white border border-[#e5e7eb] rounded-xl p-3 text-black"
                       placeholder="Search by name..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -225,7 +232,7 @@ export default function AdminDashboard() {
                 <div className="flex flex-col gap-2">
                   <label className="text-black/70 text-sm">Actions</label>
                   <button
-                    className="w-full bg-[#10B981] hover:bg-[#0f9b6f] text-black rounded-lg p-3 flex items-center justify-center gap-2"
+                    className="w-full bg-[#10B981] hover:bg-[#0f9b6f] text-black rounded-xl p-3 flex items-center justify-center gap-2"
                     onClick={exportPDF}
                   >
                     <Download className="w-4 h-4" />
@@ -236,8 +243,8 @@ export default function AdminDashboard() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-[#ffffff] rounded-lg shadow-md p-6 border-l-4 border-[#2563EB]">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-[#e5e7eb]">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-black/70 text-sm font-semibold">Total Crew</p>
@@ -249,7 +256,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="bg-[#ffffff] rounded-lg shadow-md p-6 border-l-4 border-[#F59E0B]">
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-[#e5e7eb]">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-black/70 text-sm font-semibold">Pending</p>
@@ -259,7 +266,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="bg-[#ffffff] rounded-lg shadow-md p-6 border-l-4 border-[#10B981]">
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-[#e5e7eb]">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-black/70 text-sm font-semibold">Approved</p>
@@ -269,7 +276,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="bg-[#ffffff] rounded-lg shadow-md p-6 border-l-4 border-[#EF4444]">
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-[#e5e7eb]">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-black/70 text-sm font-semibold">Disapproved</p>
@@ -278,11 +285,21 @@ export default function AdminDashboard() {
                   <XCircle className="w-12 h-12 text-[#EF4444] opacity-25" />
                 </div>
               </div>
+
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-[#e5e7eb]">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-black/70 text-sm font-semibold">Fooled</p>
+                    <p className="text-3xl font-extrabold text-black mt-2">{fooledCount}</p>
+                  </div>
+                  <Activity className="w-12 h-12 text-[#8B5CF6] opacity-25" />
+                </div>
+              </div>
             </div>
 
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              <div className="bg-[#ffffff] rounded-lg shadow-md p-6 border border-[#374151]">
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-[#e5e7eb]">
                 <h2 className="text-black font-bold mb-4">Application Trend</h2>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -301,7 +318,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="bg-[#ffffff] rounded-lg shadow-md p-6 border border-[#374151]">
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-[#e5e7eb]">
                 <h2 className="text-black font-bold mb-4">Status Distribution</h2>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -326,105 +343,124 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Sortable Table */}
-            <div className="bg-[#ffffff] rounded-lg shadow-md p-6 border border-[#374151]">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-black font-bold">Recent Applications</h2>
-                <span className="text-black/70 text-sm">
-                  Page {currentPage} of {totalPages}
-                </span>
-              </div>
+          {/* Recent Applications Table */}
+          <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-gray-900 font-semibold text-lg">Recent Applications</h2>
+              <span className="text-gray-500 text-sm">
+                Page {currentPage} of {totalPages}
+              </span>
+            </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="text-black/70 text-sm">
-                      <th
-                        className="pb-3 cursor-pointer flex items-center gap-2"
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="text-gray-500 text-sm">
+                    <th className="pb-3 pl-4 pr-6 text-left">
+                      <div
+                        className="flex items-center gap-2 cursor-pointer"
                         onClick={() => {
                           setSortBy("name");
                           setSortDir(sortDir === "asc" ? "desc" : "asc");
                         }}
                       >
-                        Name <ArrowUpDown className="w-4 h-4" />
-                      </th>
-                      <th
-                        className="pb-3 cursor-pointer flex items-center gap-2"
+                        Name <ArrowUpDown className="w-4 h-4 text-gray-400" />
+                      </div>
+                    </th>
+
+                    <th className="pb-3 pl-4 pr-6 text-left">
+                      <div
+                        className="flex items-center gap-2 cursor-pointer"
                         onClick={() => {
                           setSortBy("status");
                           setSortDir(sortDir === "asc" ? "desc" : "asc");
                         }}
                       >
-                        Status <ArrowUpDown className="w-4 h-4" />
-                      </th>
-                      <th className="pb-3">Email</th>
-                      <th
-                        className="pb-3 cursor-pointer flex items-center gap-2"
+                        Status <ArrowUpDown className="w-4 h-4 text-gray-400" />
+                      </div>
+                    </th>
+
+                    <th className="pb-3 pl-4 pr-6 text-left">Email</th>
+
+                    <th className="pb-3 pl-4 pr-6 text-left">
+                      <div
+                        className="flex items-center gap-2 cursor-pointer"
                         onClick={() => {
                           setSortBy("date");
                           setSortDir(sortDir === "asc" ? "desc" : "asc");
                         }}
                       >
-                        Date <ArrowUpDown className="w-4 h-4" />
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedCrews.map((crew, idx) => (
-                      <tr
-                        key={idx}
-                        className="border-t border-[#374151] cursor-pointer hover:bg-[#1F2937]"
-                        onClick={() => setSelectedCrew(crew)}
-                      >
-                        <td className="py-3 text-black">{crew.fullName}</td>
-                        <td className="py-3">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                              crew.status === "approved"
-                                ? "bg-green-500/20 text-green-300"
-                                : crew.status === "proposed"
-                                ? "bg-yellow-500/20 text-yellow-300"
-                                : "bg-red-500/20 text-red-300"
-                            }`}
-                          >
-                            {crew.status}
-                          </span>
-                        </td>
-                        <td className="py-3 text-black">{crew.emailAddress}</td>
-                        <td className="py-3 text-black/70">
-                          {new Date(crew.createdAt).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        Date <ArrowUpDown className="w-4 h-4 text-gray-400" />
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
 
-              {/* Pagination */}
-              <div className="flex justify-between mt-4">
-                <button
-                  className="px-4 py-2 bg-[#3B82F6] text-black rounded-lg"
-                  onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-                  disabled={currentPage === 1}
-                >
-                  Previous
-                </button>
-                <button
-                  className="px-4 py-2 bg-[#8B5CF6] text-black rounded-lg"
-                  onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </button>
-              </div>
+                <tbody>
+                  {paginatedCrews.map((crew, idx) => (
+                    <tr
+                      key={idx}
+                      className="border-t border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={() => setSelectedCrew(crew)}
+                    >
+                      <td className="py-4 pl-4 pr-6 text-gray-900 font-medium">
+                        {crew.fullName}
+                      </td>
+
+                      <td className="py-4 pl-4 pr-6">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-semibold tracking-wide ${
+                            crew.status === "approved"
+                              ? "bg-green-100 text-green-700"
+                              : crew.status === "proposed"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : crew.status === "disapproved"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-purple-100 text-purple-700"
+                          }`}
+                        >
+                          {crew.status}
+                        </span>
+                      </td>
+
+                      <td className="py-4 pl-4 pr-6 text-gray-700">
+                        {crew.emailAddress}
+                      </td>
+
+                      <td className="py-4 pl-4 pr-6 text-gray-500">
+                        {new Date(crew.createdAt).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+
+            <div className="flex justify-between items-center mt-5">
+              <button
+                className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition"
+                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </button>
+
+              <button
+                className="px-5 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition"
+                onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </button>
+            </div>
+          </div>
           </div>
         </div>
 
         {/* Modal */}
         {selectedCrew && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
-            <div className="bg-[#111827] rounded-2xl shadow-xl w-11/12 md:w-3/4 p-6 border border-[#374151]">
+            <div className="bg-white rounded-2xl shadow-xl w-11/12 md:w-3/4 p-6 border border-[#e5e7eb]">
               <div className="flex justify-between items-center">
                 <h2 className="text-black font-bold text-lg">Crew Details</h2>
                 <button
@@ -461,9 +497,36 @@ export default function AdminDashboard() {
                 <p className="text-black font-semibold">{selectedCrew.completeAddress}</p>
               </div>
 
+              <div className="mt-4 flex gap-3">
+                <button
+                  className="px-4 py-2 bg-[#F59E0B] text-black rounded-xl"
+                  onClick={() => updateStatus(selectedCrew.id, "proposed")}
+                >
+                  Proposed
+                </button>
+                <button
+                  className="px-4 py-2 bg-[#10B981] text-black rounded-xl"
+                  onClick={() => updateStatus(selectedCrew.id, "approved")}
+                >
+                  Approved
+                </button>
+                <button
+                  className="px-4 py-2 bg-[#EF4444] text-black rounded-xl"
+                  onClick={() => updateStatus(selectedCrew.id, "disapproved")}
+                >
+                  Disapproved
+                </button>
+                <button
+                  className="px-4 py-2 bg-[#8B5CF6] text-black rounded-xl"
+                  onClick={() => updateStatus(selectedCrew.id, "fooled")}
+                >
+                  Fooled
+                </button>
+              </div>
+
               <div className="mt-4">
                 <button
-                  className="px-4 py-2 bg-[#10B981] text-black rounded-lg"
+                  className="px-4 py-2 bg-[#111827] text-white rounded-xl"
                   onClick={() => setSelectedCrew(null)}
                 >
                   Close

@@ -27,7 +27,7 @@ export default function CrewApplications() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<
-  "all" | "pending" | "proposed" | "approved" | "disapproved" | "pulled"
+  "all" | "pending" | "proposed" | "approved" | "disapproved" | "fooled"
 >("all");
 
   const [page, setPage] = useState(1);
@@ -51,13 +51,20 @@ export default function CrewApplications() {
 
   const handleDisapprove = (id: string, reconsider?: boolean) => {
     if (reconsider) {
-      dataStore.updateCrew(id, { status: "pulled" });
+      dataStore.updateCrew(id, { status: "fooled" });
     } else {
       dataStore.updateCrew(id, { status: "disapproved" });
     }
     refreshCrews();
     setSelectedCrew(null);
   };
+
+  const handleFooled = (id: string) => {
+  dataStore.updateCrew(id, { status: "fooled" });
+  refreshCrews();
+  setSelectedCrew(null);
+};
+
 
   const handleDelete = (id: string) => {
     dataStore.deleteCrew(id);
@@ -169,7 +176,7 @@ export default function CrewApplications() {
                 <option value="proposed">Proposed</option>
                 <option value="approved">Approved</option>
                 <option value="disapproved">Disapproved</option>
-                <option value="pulled">Pulled</option>
+                <option value="fooled">Fooled</option>
               </select>
               </div>
 
@@ -226,8 +233,8 @@ export default function CrewApplications() {
                               : crew.status === "proposed"
                               ? "bg-yellow-100 text-yellow-700"
                               : crew.status === "pending"
-                              ? "bg-gray-100 text-gray-700"
-                              : crew.status === "pulled"
+                              ? "bg-orange-600 text-gray-900"
+                              : crew.status === "fooled"
                               ? "bg-orange-100 text-orange-700"
                               : "bg-red-100 text-red-700"}`}
                         >
@@ -300,12 +307,13 @@ export default function CrewApplications() {
 
           {selectedCrew && (
             <CrewDetailsModal
-              crew={selectedCrew}
-              onClose={() => setSelectedCrew(null)}
-              onApprove={handleApprove}
-              onDisapprove={handleDisapprove}
-              onProposed={handleProposed}
-            />
+            crew={selectedCrew}
+            onClose={() => setSelectedCrew(null)}
+            onApprove={handleApprove}
+            onDisapprove={handleDisapprove}
+            onProposed={handleProposed}
+            onFooled={handleFooled}   // NEW
+          />
           )}
 
           {showAddForm && (

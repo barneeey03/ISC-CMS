@@ -1,4 +1,3 @@
-
 export type Certificate = {
   id: string;
   name: string;
@@ -15,7 +14,7 @@ export type VesselExperience = {
   vesselName: string;
   flag: string;
   vesselType: string;
-  grt: string;         // <-- ADD THIS
+  grt: string;
   engineMaker: string;
   trading: string;
   route: string;
@@ -105,7 +104,7 @@ export interface CrewMember {
   vesselType: string;
 
   // ✅ UPDATED STATUS
-  status: "pending" | "proposed" | "approved" | "disapproved" | "pulled";
+  status: "pending" | "proposed" | "approved" | "disapproved" | "fooled";
 
   // ✅ REMARKS ADDED
   remarks: string;
@@ -150,6 +149,16 @@ class DataStore {
       return updated;
     }
     return undefined;
+  }
+
+  // ✅ NEW METHOD: UPDATE STATUS
+  updateCrewStatus(id: string, status: CrewMember["status"]): CrewMember | undefined {
+    const crew = this.crews.get(id);
+    if (!crew) return undefined;
+
+    const updatedCrew = { ...crew, status };
+    this.crews.set(id, updatedCrew);
+    return updatedCrew;
   }
 
   deleteCrew(id: string): boolean {
