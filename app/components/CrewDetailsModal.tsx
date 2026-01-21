@@ -14,11 +14,12 @@ export function CrewDetailsModal({
   crew: CrewMember;
   onClose: () => void;
   onApprove: (id: string) => void;
-  onDisapprove: (id: string) => void;
+  onDisapprove: (id: string, reconsider?: boolean) => void;
   onProposed: (id: string) => void;
 }) {
 
   const [openSection, setOpenSection] = useState<string | null>("basic");
+  const [showReconsider, setShowReconsider] = useState(false);
 
   const toggleSection = (section: string) => {
     setOpenSection((prev) => (prev === section ? null : section));
@@ -36,36 +37,52 @@ export function CrewDetailsModal({
 
         <div className="p-6 space-y-6">
           
-          {/* ====== ACTION BUTTONS ====== */}
+          {/* ACTION BUTTONS */}
           <div className="flex gap-3 mt-4 justify-end">
-            {crew.status !== "proposed" && (
-              <button
-                onClick={() => onProposed(crew.id)}
-                className="px-4 py-2 rounded-lg bg-yellow-400 text-white font-semibold"
-              >
-                Proposed
-              </button>
-            )}
+            <button
+              onClick={() => onProposed(crew.id)}
+              className="px-4 py-2 rounded-lg bg-yellow-400 text-white font-semibold"
+            >
+              Proposed
+            </button>
 
-            {crew.status !== "approved" && (
-              <button
-                onClick={() => onApprove(crew.id)}
-                className="px-4 py-2 rounded-lg bg-green-500 text-white font-semibold"
-              >
-                Approve
-              </button>
-            )}
+            <button
+              onClick={() => onApprove(crew.id)}
+              className="px-4 py-2 rounded-lg bg-green-500 text-white font-semibold"
+            >
+              Approve
+            </button>
 
-            {crew.status !== "disapproved" && (
-              <button
-                onClick={() => onDisapprove(crew.id)}
-                className="px-4 py-2 rounded-lg bg-red-500 text-white font-semibold"
-              >
-                Disapprove
-              </button>
-            )}
+            <button
+              onClick={() => setShowReconsider(true)}
+              className="px-4 py-2 rounded-lg bg-red-500 text-white font-semibold"
+            >
+              Disapprove
+            </button>
           </div>
 
+          {showReconsider && (
+            <div className="p-4 border rounded-xl bg-red-50">
+              <p className="font-semibold text-red-700">
+                Do you want to reconsider?
+              </p>
+              <div className="flex gap-3 mt-3">
+                <button
+                  onClick={() => onDisapprove(crew.id, true)}
+                  className="px-4 py-2 rounded-lg bg-yellow-400 text-white font-semibold"
+                >
+                  Yes (Pulled)
+                </button>
+                <button
+                  onClick={() => onDisapprove(crew.id, false)}
+                  className="px-4 py-2 rounded-lg bg-red-500 text-white font-semibold"
+                >
+                  No (Disapproved)
+                </button>
+              </div>
+            </div>
+          )}
+          
           {/* ====== DETAILS SECTIONS ====== */}
           <Section
             title="Basic Information"

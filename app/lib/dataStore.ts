@@ -1,4 +1,3 @@
-// app/lib/dataStore.ts
 
 export type Certificate = {
   id: string;
@@ -106,7 +105,7 @@ export interface CrewMember {
   vesselType: string;
 
   // ✅ UPDATED STATUS
-  status: "proposed" | "approved" | "disapproved";
+  status: "pending" | "proposed" | "approved" | "disapproved" | "pulled";
 
   // ✅ REMARKS ADDED
   remarks: string;
@@ -116,13 +115,18 @@ class DataStore {
   private crews: Map<string, CrewMember> = new Map();
   private nextId = 1;
 
-  addCrew(crew: Omit<CrewMember, "id" | "createdAt">): CrewMember {
+  addCrew(
+    crew: Omit<CrewMember, "id" | "createdAt" | "status">
+  ): CrewMember {
     const id = `crew-${this.nextId++}`;
+
     const newCrew: CrewMember = {
       ...crew,
       id,
       createdAt: new Date().toISOString(),
+      status: "pending", // DEFAULT STATUS
     };
+
     this.crews.set(id, newCrew);
     return newCrew;
   }
@@ -135,7 +139,10 @@ class DataStore {
     return Array.from(this.crews.values());
   }
 
-  updateCrew(id: string, updates: Partial<CrewMember>): CrewMember | undefined {
+  updateCrew(
+    id: string,
+    updates: Partial<CrewMember>
+  ): CrewMember | undefined {
     const crew = this.crews.get(id);
     if (crew) {
       const updated = { ...crew, ...updates };

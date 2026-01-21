@@ -107,7 +107,7 @@ export function CrewApplicationForm({
     medical: { certificateType: "", issuingClinic: "", dateIssued: "", expiryDate: "" },
 
     vesselType: "",
-    status: "proposed",
+    status: "pending",
 
     rank: "",
     remarks: "",
