@@ -1,7 +1,6 @@
 "use client";
 
-import React from "react"
-
+import React from "react";
 import { useState, useCallback } from "react";
 import { SuperAdminSidebar } from "@/app/components/SuperAdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
@@ -60,9 +59,12 @@ export default function VesselAssignment() {
 
   return (
     <ProtectedRoute requiredRole="super-admin">
-      <div className="flex">
+      <div className="flex min-h-screen bg-[#F5F9FC]">
         <SuperAdminSidebar />
-        <div className="flex-1 bg-[#F5F9FC] min-h-screen">
+
+        {/* MAIN CONTENT */}
+        {/* ADD ml-64 to avoid sidebar overlap */}
+        <div className="flex-1 min-h-screen ml-64">
           {/* Header */}
           <div className="bg-white border-b border-[#E0E8F0] p-6">
             <h1 className="text-3xl font-extrabold text-[#002060]">Vessel Assignment</h1>
