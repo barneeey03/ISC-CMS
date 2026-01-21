@@ -41,15 +41,14 @@ export default function DisapprovedCrew() {
     refreshCrews();
   }, [refreshCrews]);
 
-  const handleReconsider = async (id: string) => {
-    await updateCrewInFirestore(id, { status: "approved" });
-    await refreshCrews();
-  };
-
   const handleDelete = async (id: string) => {
-    await deleteCrewFromFirestore(id);
-    await refreshCrews();
-  };
+  const confirmed = confirm("Are you sure you want to delete this crew application?");
+  if (!confirmed) return;
+
+  await deleteCrewFromFirestore(id);
+  await refreshCrews();
+};
+
 
   const disapprovedCrews = useMemo(() => {
     let filtered = crews.filter((c) => c.status === "disapproved");
@@ -226,14 +225,6 @@ export default function DisapprovedCrew() {
                               title="View Details"
                             >
                               <Eye className="w-4 h-4" />
-                            </button>
-
-                            <button
-                              onClick={() => handleReconsider(crew.id)}
-                              className="flex items-center justify-center w-9 h-9 rounded-lg bg-[#0080C0] hover:bg-[#006BA0] transition"
-                              title="Reconsider"
-                            >
-                              <RotateCcw className="w-4 h-4 text-white" />
                             </button>
 
                             <button
