@@ -1,9 +1,9 @@
 "use client";
 
+import React, { useEffect, useMemo, useState } from "react";
 import { AdminSidebar } from "@/app/components/AdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 import { useAuth } from "@/app/context/AuthContext";
-import { dataStore } from "@/app/lib/dataStore";
 import {
   Users,
   FileCheck,
@@ -28,11 +28,6 @@ import {
   Legend,
 } from "recharts";
 
-import React from "react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import { CrewMember } from "@/app/lib/type";
-
 const THEME_COLORS = {
   green: "#10B981",
   amber: "#F59E0B",
@@ -41,57 +36,82 @@ const THEME_COLORS = {
   purple: "#8B5CF6",
 };
 
+const COLORS = [
+  THEME_COLORS.blue,
+  THEME_COLORS.amber,
+  THEME_COLORS.red,
+  THEME_COLORS.purple,
+];
+
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { listenCrewApplications, updateCrewInFirestore } from "@/app/lib/crewservice";
+
 type CrewStatus = "all" | "approved" | "pending" | "disapproved" | "fooled";
 
 export default function AdminDashboard() {
   const { email } = useAuth();
-  const allCrews = dataStore.getAllCrews();
 
-  const [realtimeTrigger, setRealtimeTrigger] = React.useState(0);
-  React.useEffect(() => {
-    const interval = setInterval(() => {
-      setRealtimeTrigger((prev) => prev + 1);
-    }, 2000);
-    return () => clearInterval(interval);
+  const [crews, setCrews] = useState<any[]>([]);
+  const [statusFilter, setStatusFilter] = useState<CrewStatus>("all");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"name" | "status" | "date">("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+  const [selectedCrew, setSelectedCrew] = useState<any>(null);
+
+  // 🔥 REALTIME FIRESTORE SYNC
+  useEffect(() => {
+    const unsubscribe = listenCrewApplications((data: any[]) => {
+      setCrews(data);
+    });
+    return () => unsubscribe();
   }, []);
 
-  const [statusFilter, setStatusFilter] = React.useState<CrewStatus>("all");
-  const [startDate, setStartDate] = React.useState<string>("");
-  const [endDate, setEndDate] = React.useState<string>("");
-  const [searchQuery, setSearchQuery] = React.useState("");
+  // Filter + Sort + Pagination
+  const filteredCrews = useMemo(() => {
+    let list = crews;
 
-  const [sortBy, setSortBy] = React.useState<"name" | "status" | "date">("date");
-  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc");
+    if (statusFilter !== "all") {
+      if (statusFilter === "pending") {
+        list = list.filter(
+          (c) => c.status === "proposed" || c.status === "pending"
+        );
+      } else {
+        list = list.filter((c) => c.status === statusFilter);
+      }
+    }
 
-  const [currentPage, setCurrentPage] = React.useState(1);
-  const ITEMS_PER_PAGE = 10;
-
-  const [selectedCrew, setSelectedCrew] = React.useState<any>(null);
-
-  const filteredCrews = allCrews
-    .filter((crew) => {
-      if (statusFilter === "all") return true;
-      if (statusFilter === "pending") return crew.status === "proposed";
-      if (statusFilter === "fooled") return crew.status === "fooled";
-      return crew.status === statusFilter;
-    })
-    .filter((crew) => {
-      if (!startDate && !endDate) return true;
-      const created = new Date(crew.createdAt).getTime();
+    if (startDate || endDate) {
       const start = startDate ? new Date(startDate).getTime() : -Infinity;
       const end = endDate ? new Date(endDate).getTime() : Infinity;
-      return created >= start && created <= end;
-    })
-    .filter((crew) => {
-      if (!searchQuery) return true;
-      return crew.fullName.toLowerCase().includes(searchQuery.toLowerCase());
-    })
-    .sort((a, b) => {
+      list = list.filter((c) => {
+        const created = new Date(c.createdAt).getTime();
+        return created >= start && created <= end;
+      });
+    }
+
+    if (searchQuery) {
+      list = list.filter((c) =>
+        c.fullName.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    list = list.sort((a: any, b: any) => {
       const dir = sortDir === "asc" ? 1 : -1;
       if (sortBy === "name") return a.fullName.localeCompare(b.fullName) * dir;
       if (sortBy === "status") return a.status.localeCompare(b.status) * dir;
-      return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir;
+      return (
+        (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) *
+        dir
+      );
     });
+
+    return list;
+  }, [crews, statusFilter, startDate, endDate, searchQuery, sortBy, sortDir]);
 
   const totalPages = Math.ceil(filteredCrews.length / ITEMS_PER_PAGE);
   const paginatedCrews = filteredCrews.slice(
@@ -100,10 +120,13 @@ export default function AdminDashboard() {
   );
 
   const approvedCount = filteredCrews.filter((c) => c.status === "approved").length;
-  const pendingCount = filteredCrews.filter((c) => c.status === "proposed").length;
+  const pendingCount = filteredCrews.filter(
+    (c) => c.status === "proposed" || c.status === "pending"
+  ).length;
   const disapprovedCount = filteredCrews.filter((c) => c.status === "disapproved").length;
   const fooledCount = filteredCrews.filter((c) => c.status === "fooled").length;
 
+  // Chart Data
   const trendData = filteredCrews
     .map((crew) => ({ date: new Date(crew.createdAt).toLocaleDateString() }))
     .reduce((acc, cur) => {
@@ -121,13 +144,7 @@ export default function AdminDashboard() {
     { name: "Fooled", value: fooledCount },
   ];
 
-  const COLORS = [
-    THEME_COLORS.blue,
-    THEME_COLORS.amber,
-    THEME_COLORS.red,
-    THEME_COLORS.purple,
-  ];
-
+  // PDF Export
   const exportPDF = () => {
     const doc = new jsPDF("landscape");
     doc.setFontSize(16);
@@ -145,16 +162,14 @@ export default function AdminDashboard() {
       body: tableData,
       startY: 30,
       theme: "grid",
-      headStyles: { fillColor: THEME_COLORS.purple },
     });
 
     doc.save("crew_report.pdf");
   };
 
-  const updateStatus = (crewId: string, status: CrewMember["status"]) => {
-    dataStore.updateCrewStatus(crewId, status);
+  const updateStatus = async (crewId: string, status: any) => {
+    await updateCrewInFirestore(crewId, { status });
     setSelectedCrew(null);
-    setRealtimeTrigger((prev) => prev + 1);
   };
 
   return (
@@ -412,7 +427,7 @@ export default function AdminDashboard() {
                           className={`px-3 py-1 rounded-full text-xs font-semibold tracking-wide ${
                             crew.status === "approved"
                               ? "bg-green-100 text-green-700"
-                              : crew.status === "proposed"
+                              : crew.status === "proposed" || crew.status === "pending"
                               ? "bg-yellow-100 text-yellow-700"
                               : crew.status === "disapproved"
                               ? "bg-red-100 text-red-700"

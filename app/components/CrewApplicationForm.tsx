@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
 import { dataStore, Certificate, CrewMember, VesselExperience } from "@/app/lib/dataStore";
+import { addCrewToFirestore, updateCrewInFirestore } from "@/app/lib/crewservice";
+import { serverTimestamp } from "firebase/firestore";
 
 type CrewFormData = Omit<CrewMember, "id" | "createdAt" | "age"> & {
   age: string;
@@ -271,23 +273,30 @@ export function CrewApplicationForm({
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    const payload: Omit<CrewMember, "id" | "createdAt"> = {
-      ...formData,
-      age: Number(formData.age),
-    };
+  const payload = {
+  ...formData,
+  age: Number(formData.age),
+};
 
+await addCrewToFirestore(payload);
+
+  try {
     if (mode === "edit" && crew?.id) {
-      dataStore.updateCrew(crew.id, payload);
+      await updateCrewInFirestore(crew.id, payload);
     } else {
-      dataStore.addCrew(payload);
+      await addCrewToFirestore(payload);
     }
 
     onSuccess();
     onClose();
-  };
+  } catch (error: any) {
+    console.error("Firestore Error:", error);
+    alert("Failed to submit: " + (error?.message || "Unknown error"));
+  }
+};
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">

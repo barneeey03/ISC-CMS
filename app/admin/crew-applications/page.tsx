@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { AdminSidebar } from "@/app/components/AdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 import { CrewApplicationForm } from "@/app/components/CrewApplicationForm";
 import { CrewDetailsModal } from "@/app/components/CrewDetailsModal";
-import { dataStore, CrewMember } from "@/app/lib/dataStore";
+import { CrewMember } from "@/app/lib/dataStore";
 
 import {
   Plus,
@@ -17,58 +17,65 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 
+import {
+  getCrewApplications,
+  updateCrewInFirestore,
+  deleteCrewFromFirestore,
+} from "@/app/lib/crewservice";
+
 export default function CrewApplications() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
 
-  const [crews, setCrews] = useState<CrewMember[]>(dataStore.getAllCrews());
+  const [crews, setCrews] = useState<CrewMember[]>([]);
   const [selectedCrew, setSelectedCrew] = useState<CrewMember | null>(null);
   const [editCrew, setEditCrew] = useState<CrewMember | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<
-  "all" | "pending" | "proposed" | "approved" | "disapproved" | "fooled"
->("all");
+    "all" | "pending" | "proposed" | "approved" | "disapproved" | "fooled"
+  >("all");
 
   const [page, setPage] = useState(1);
   const perPage = 8;
 
-  const refreshCrews = useCallback(() => {
-    setCrews(dataStore.getAllCrews());
+  const refreshCrews = useCallback(async () => {
+    const list = await getCrewApplications();
+    setCrews(list);
   }, []);
 
-  const handleProposed = (id: string) => {
-    dataStore.updateCrew(id, { status: "proposed" });
+  useEffect(() => {
     refreshCrews();
+  }, [refreshCrews]);
+
+  const handleProposed = async (id: string) => {
+    await updateCrewInFirestore(id, { status: "proposed" });
+    await refreshCrews();
     setSelectedCrew(null);
+    setStatusFilter("all");
   };
 
-  const handleApprove = (id: string) => {
-    dataStore.updateCrew(id, { status: "approved" });
-    refreshCrews();
+  const handleApprove = async (id: string) => {
+    await updateCrewInFirestore(id, { status: "approved" });
+    await refreshCrews();
     setSelectedCrew(null);
+    setStatusFilter("all");
   };
 
-  const handleDisapprove = (id: string, reconsider?: boolean) => {
+  const handleDisapprove = async (id: string, reconsider?: boolean) => {
     if (reconsider) {
-      dataStore.updateCrew(id, { status: "fooled" });
+      await updateCrewInFirestore(id, { status: "fooled" });
     } else {
-      dataStore.updateCrew(id, { status: "disapproved" });
+      await updateCrewInFirestore(id, { status: "disapproved" });
     }
-    refreshCrews();
+    await refreshCrews();
     setSelectedCrew(null);
+    setStatusFilter("all");
   };
 
-  const handleFooled = (id: string) => {
-  dataStore.updateCrew(id, { status: "fooled" });
-  refreshCrews();
-  setSelectedCrew(null);
-};
-
-
-  const handleDelete = (id: string) => {
-    dataStore.deleteCrew(id);
-    refreshCrews();
+  const handleDelete = async (id: string) => {
+    await deleteCrewFromFirestore(id);
+    await refreshCrews();
   };
 
   const handleEdit = (crew: CrewMember) => {
@@ -76,8 +83,11 @@ export default function CrewApplications() {
     setShowEditForm(true);
   };
 
-  const getAge = (dob: string) => {
+  const getAge = (dob: string | undefined) => {
+    if (!dob) return "—";
     const birthDate = new Date(dob);
+    if (isNaN(birthDate.getTime())) return "—";
+
     const diff = Date.now() - birthDate.getTime();
     const ageDate = new Date(diff);
     return Math.abs(ageDate.getUTCFullYear() - 1970);
@@ -167,17 +177,19 @@ export default function CrewApplications() {
               {/* STATUS DROPDOWN */}
               <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg shadow-sm border">
                 <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="w-full outline-none text-sm text-gray-700"
-              >
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="proposed">Proposed</option>
-                <option value="approved">Approved</option>
-                <option value="disapproved">Disapproved</option>
-                <option value="fooled">Fooled</option>
-              </select>
+                  value={statusFilter}
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value as any)
+                  }
+                  className="w-full outline-none text-sm text-gray-700"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="proposed">Proposed</option>
+                  <option value="approved">Approved</option>
+                  <option value="disapproved">Disapproved</option>
+                  <option value="fooled">Fooled</option>
+                </select>
               </div>
 
               {/* BUTTONS */}
@@ -307,13 +319,13 @@ export default function CrewApplications() {
 
           {selectedCrew && (
             <CrewDetailsModal
-            crew={selectedCrew}
-            onClose={() => setSelectedCrew(null)}
-            onApprove={handleApprove}
-            onDisapprove={handleDisapprove}
-            onProposed={handleProposed}
-            onFooled={handleFooled}   // NEW
-          />
+              crew={selectedCrew}
+              onClose={() => setSelectedCrew(null)}
+              onApprove={handleApprove}
+              onDisapprove={handleDisapprove}
+              onProposed={handleProposed} onFooled={function (id: string): void {
+                throw new Error("Function not implemented.");
+              } }            />
           )}
 
           {showAddForm && (
