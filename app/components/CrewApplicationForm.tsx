@@ -18,6 +18,14 @@ interface CrewApplicationFormProps {
 const inputStyle =
   "px-4 py-2.5 rounded-lg border border-[#D0E0F0] bg-[#F9FBFD] text-[#002060] placeholder-[#80A0C0] focus:outline-none focus:ring-2 focus:ring-[#60A0C0] text-sm transition";
 
+const OFFICE_DOCUMENTS = [
+  "Passport",
+  "SIRB",
+  "U.S Visa",
+  "MARINA SRN",
+  "DMW E-Reg No",
+];
+
 const CERTIFICATES = [
   "C.O.P. BASIC TRAINING",
   "C.O.P. ADVANCED TRAINING IN FIRE FIGHTING",
@@ -45,58 +53,65 @@ export function CrewApplicationForm({
   mode = "add",
   crew,
 }: CrewApplicationFormProps) {
-const [formData, setFormData] = useState<CrewFormData>({
-  dateApplied: "",
-  presentRank: "",
-  prevSalary: "",
-  province: "",
-  dateOfAvailability: "",
-  expectedSalary: "",
-  placeOfBirth: "",
-  numOfChildren: "",
-  religion: "",
-  nextOfKin: "",
-  nextOfKinAddress: "",
-  schoolAttended: "",
-  weight: "",
-  course: "",
-  yearGraduated: "",
-  bmi: "",
-  ishihara: "",
+  const [formData, setFormData] = useState<CrewFormData>({
+    dateApplied: "",
+    presentRank: "",
+    prevSalary: "",
+    province: "",
+    dateOfAvailability: "",
+    expectedSalary: "",
+    placeOfBirth: "",
+    numOfChildren: "",
+    religion: "",
+    nextOfKin: "",
+    nextOfKinAddress: "",
+    schoolAttended: "",
+    weight: "",
+    course: "",
+    yearGraduated: "",
+    bmi: "",
+    ishihara: "",
 
-  certificates: [],
-  vesselExperience: [],
+    certificates: [],
+    vesselExperience: [],
 
-  fullName: "",
-  fathersName: "",
-  mothersName: "",
-  dateOfBirth: "",
-  age: "",
-  nationality: "",
-  gender: "",
-  height: "",
-  uniformSize: "",
-  civilStatus: "",
+    fullName: "",
+    fathersName: "",
+    mothersName: "",
+    dateOfBirth: "",
+    age: "",
+    nationality: "",
+    gender: "",
+    height: "",
+    uniformSize: "",
+    civilStatus: "",
 
-  mobileNumber: "",
-  emailAddress: "",
-  completeAddress: "",
+    mobileNumber: "",
+    emailAddress: "",
+    completeAddress: "",
 
-  highSchool: { schoolName: "", yearGraduated: "" },
-  college: { schoolName: "", course: "", yearGraduated: "" },
+    highSchool: { schoolName: "", yearGraduated: "" },
+    college: { schoolName: "", course: "", yearGraduated: "" },
 
-  documents: [],
-  seaService: [],
-  medical: { certificateType: "", issuingClinic: "", dateIssued: "", expiryDate: "" },
+    documents: [
+      {
+        id: `doc-${Date.now()}`,
+        name: "",
+        placeIssued: "",
+        dateIssued: "",
+        expiryDate: "",
+      },
+    ],
 
-  vesselType: "",
-  status: "proposed",
+    seaService: [],
+    medical: { certificateType: "", issuingClinic: "", dateIssued: "", expiryDate: "" },
 
-  // ⚠️ ADD THIS:
-  rank: "",
+    vesselType: "",
+    status: "pending",
 
-  remarks: "",
-});
+    rank: "",
+    remarks: "",
+  });
 
   useEffect(() => {
     if (mode === "edit" && crew) {
@@ -118,30 +133,30 @@ const [formData, setFormData] = useState<CrewFormData>({
     return String(age);
   };
 
- const handleInputChange = (
-  e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-) => {
-  const { name, value } = e.target;
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
 
-  if (name === "dateOfBirth") {
-    setFormData((prev) => ({
-      ...prev,
-      dateOfBirth: value,
-      age: calculateAge(value),
-    }));
-    return;
-  }
+    if (name === "dateOfBirth") {
+      setFormData((prev) => ({
+        ...prev,
+        dateOfBirth: value,
+        age: calculateAge(value),
+      }));
+      return;
+    }
 
-  if (name.includes(".")) {
-    const [parent, child] = name.split(".");
-    setFormData((prev) => ({
-      ...prev,
-      [parent]: { ...(prev as any)[parent], [child]: value },
-    }));
-  } else {
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  }
-};
+    if (name.includes(".")) {
+      const [parent, child] = name.split(".");
+      setFormData((prev) => ({
+        ...prev,
+        [parent]: { ...(prev as any)[parent], [child]: value },
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+  };
 
   const addCertificate = () => {
     setFormData((prev) => ({
@@ -156,6 +171,42 @@ const [formData, setFormData] = useState<CrewFormData>({
           validUntil: "",
         },
       ],
+    }));
+  };
+
+  const addDocument = () => {
+    setFormData((prev) => ({
+      ...prev,
+      documents: [
+        ...prev.documents,
+        {
+          id: `doc-${Date.now()}`,
+          name: "",
+          placeIssued: "",
+          dateIssued: "",
+          expiryDate: "",
+        },
+      ],
+    }));
+  };
+
+  const removeDocument = (id: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      documents: prev.documents.filter((d) => d.id !== id),
+    }));
+  };
+
+  const updateDocument = (
+    id: string,
+    field: "name" | "placeIssued" | "dateIssued" | "expiryDate",
+    value: string
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      documents: prev.documents.map((d) =>
+        d.id === id ? { ...d, [field]: value } : d
+      ),
     }));
   };
 
@@ -311,7 +362,7 @@ const [formData, setFormData] = useState<CrewFormData>({
                 onChange={handleInputChange}
                 required
                 className={inputStyle}
-                placeholder="Province"
+                placeholder="Position Applied For"
               />
             </div>
           </section>
@@ -485,41 +536,148 @@ const [formData, setFormData] = useState<CrewFormData>({
             </div>
           </section>
 
-          {/* DOCUMENTS */}
+          {/* VESSEL TYPE */}
           <section className="border border-[#E0E8F0] rounded-xl p-6">
             <h3 className="text-lg font-bold text-[#0080C0] mb-5">
-              Documents
+              Vessel Type
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <input
-                name="weight"
-                value={formData.weight}
+                name="vesselType"
+                value={formData.vesselType}
                 onChange={handleInputChange}
                 className={inputStyle}
-                placeholder="Weight (kg)"
+                placeholder="Vessel Type"
               />
+            </div>
+          </section>
+
+          {/* FOR OFFICE USE ONLY */}
+          <section className="border border-[#E0E8F0] rounded-xl p-6 bg-[#F9FBFD]">
+            <h3 className="text-lg font-bold text-[#0080C0] mb-5">
+              FOR OFFICE USE ONLY
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Height */}
               <input
                 name="height"
                 value={formData.height}
                 onChange={handleInputChange}
                 className={inputStyle}
                 placeholder="Height (cm)"
+                type="number"
+                min="0"
               />
+
+              {/* Weight */}
+              <input
+                name="weight"
+                value={formData.weight}
+                onChange={handleInputChange}
+                className={inputStyle}
+                placeholder="Weight (kg)"
+                type="number"
+                min="0"
+              />
+
+              {/* BMI */}
               <input
                 name="bmi"
                 value={formData.bmi}
                 onChange={handleInputChange}
                 className={inputStyle}
                 placeholder="BMI"
+                type="text"
               />
-              <input
+
+              {/* Ishihara Test */}
+              <select
                 name="ishihara"
                 value={formData.ishihara}
                 onChange={handleInputChange}
                 className={inputStyle}
-                placeholder="Ishihara Test"
-              />
+              >
+                <option value="">Ishihara Test</option>
+                <option value="Normal">Normal</option>
+                <option value="Defective">Defective</option>
+              </select>
+            </div>
+          </section>
+
+          {/* DOCUMENTS */}
+          <section className="border border-[#E0E8F0] rounded-xl p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-[#0080C0]">
+                Documents
+              </h3>
+              <button
+                type="button"
+                onClick={addDocument}
+                className="flex items-center gap-2 bg-[#0080C0] text-white px-4 py-2 rounded-lg"
+              >
+                <Plus className="w-4 h-4" /> Add Document
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {formData.documents.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end"
+                >
+                  <select
+                    value={doc.name}
+                    onChange={(e) =>
+                      updateDocument(doc.id, "name", e.target.value)
+                    }
+                    className={inputStyle}
+                  >
+                    <option value="">Select Document</option>
+                    {OFFICE_DOCUMENTS.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+
+                  <input
+                    value={doc.placeIssued}
+                    onChange={(e) =>
+                      updateDocument(doc.id, "placeIssued", e.target.value)
+                    }
+                    className={inputStyle}
+                    placeholder="Document No."
+                  />
+
+                  <input
+                    type="date"
+                    value={doc.dateIssued}
+                    onChange={(e) =>
+                      updateDocument(doc.id, "dateIssued", e.target.value)
+                    }
+                    className={inputStyle}
+                  />
+
+                  <input
+                    type="date"
+                    value={doc.expiryDate}
+                    onChange={(e) =>
+                      updateDocument(doc.id, "expiryDate", e.target.value)
+                    }
+                    className={inputStyle}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => removeDocument(doc.id)}
+                    className="flex items-center justify-center border border-[#D0E0F0] rounded-lg p-2 hover:bg-[#F9FBFD]"
+                  >
+                    <Trash2 className="w-4 h-4 text-[#FF0000]" />
+                  </button>
+                </div>
+              ))}
             </div>
           </section>
 
@@ -691,7 +849,7 @@ const [formData, setFormData] = useState<CrewFormData>({
             </div>
           </section>
 
-          {/* ✅ REMARKS SECTION ADDED */}
+          {/* REMARKS */}
           <section className="border border-[#E0E8F0] rounded-xl p-6">
             <h3 className="text-lg font-bold text-[#0080C0] mb-5">
               Remarks

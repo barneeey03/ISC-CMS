@@ -1,4 +1,4 @@
-export type CrewMemberStatus = "proposed" | "approved" | "disapproved";
+export type CrewMemberStatus = "pending" | "proposed" | "approved" | "disapproved";
 
 export type Certificate = {
   id: string;

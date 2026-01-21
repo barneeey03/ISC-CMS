@@ -106,7 +106,7 @@ export interface CrewMember {
   vesselType: string;
 
   // ✅ UPDATED STATUS
-  status: "proposed" | "approved" | "disapproved";
+  status: "pending" | "approved" | "disapproved";
 
   // ✅ REMARKS ADDED
   remarks: string;

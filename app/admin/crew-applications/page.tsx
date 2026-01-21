@@ -183,79 +183,81 @@ export default function CrewApplications() {
               </div>
             </div>
 
-      {/* TABLE */}
-      <div className="overflow-x-auto bg-white rounded-xl shadow border">
-        <table className="min-w-full divide-y">
-          <thead className="bg-blue-200">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Rank</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Vessel Type</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Age</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Remarks</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-800">Action</th>
-            </tr>
-          </thead>
-
-          <tbody className="divide-y bg-white">
-            {paginatedCrews.map((crew) => (
-              <tr key={crew.id} className="hover:bg-blue-50">
-                <td className="px-6 py-4 text-gray-600">{crew.presentRank}</td>
-                <td className="px-6 py-4 font-medium text-gray-800">{crew.fullName}</td>
-                <td className="px-6 py-4 text-gray-600">{crew.vesselType}</td>
-                <td className="px-6 py-4 text-gray-600">{getAge(crew.dateOfBirth)}</td>
-                <td className="px-6 py-4 text-gray-600">{crew.emailAddress}</td>
-
-                <td className="px-6 py-4 text-center">
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold
-                    ${crew.status === "approved"
-                      ? "bg-green-100 text-green-700"
-                      : crew.status === "proposed"
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-red-100 text-red-700"}`}
-                  >
-                    {crew.status.toUpperCase()}
-                  </span>
-                </td>
-
-                {/* REMARKS COLUMN */}
-                <td className="px-6 py-4 text-gray-600">
-                  {crew.remarks || "No remarks"}
-                </td>
-
-                {/* ACTION COLUMN */}
-                <td className="px-6 py-4">
-                  <div className="flex gap-2 justify-end">
-                    <button
-                      onClick={() => setSelectedCrew(crew)}
-                      className="px-3 py-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200"
-                    >
-                      View
-                    </button>
-
-                    <button
-                      onClick={() => handleEdit(crew)}
-                      className="px-3 py-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200"
-                    >
-                      Edit
-                    </button>
-
-                    <button
-                      onClick={() => handleDelete(crew.id)}
-                      className="px-3 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
+            {/* TABLE */}
+        <div className="overflow-x-auto bg-white rounded-xl shadow border">
+          <table className="min-w-full divide-y">
+            <thead className="bg-blue-200">
+              <tr>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Rank</th>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Name</th>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Vessel Type</th>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Age</th>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Email</th>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Status</th>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Remarks</th>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+
+            <tbody className="divide-y bg-white">
+              {paginatedCrews.map((crew) => (
+                <tr key={crew.id} className="hover:bg-blue-50">
+                  <td className="px-6 py-4 text-center text-gray-600">{crew.presentRank}</td>
+                  <td className="px-6 py-4 text-center font-medium text-gray-800">{crew.fullName}</td>
+                  <td className="px-6 py-4 text-center text-gray-600">{crew.vesselType}</td>
+                  <td className="px-6 py-4 text-center text-gray-600">{getAge(crew.dateOfBirth)}</td>
+                  <td className="px-6 py-4 text-center text-gray-600">{crew.emailAddress}</td>
+
+                  <td className="px-6 py-4 text-center">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold
+                        ${crew.status === "approved"
+                          ? "bg-green-100 text-green-700"
+                          : crew.status === "pending"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-red-100 text-red-700"}`}
+                    >
+                      {crew.status.toUpperCase()}
+                    </span>
+                  </td>
+
+                  <td className="px-6 py-4 text-center text-gray-600">
+                    {crew.remarks || "No remarks"}
+                  </td>
+
+                  {/* ACTION COLUMN */}
+                  <td className="px-6 py-4">
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={() => setSelectedCrew(crew)}
+                        className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
+                        title="View Details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        onClick={() => handleEdit(crew)}
+                        className="p-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition"
+                        title="Edit"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        onClick={() => handleDelete(crew.id)}
+                        className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
             {/* PAGINATION */}
             <div className="flex justify-between items-center mt-6">
