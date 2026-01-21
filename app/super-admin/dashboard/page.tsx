@@ -1,155 +1,315 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { SuperAdminSidebar } from "@/app/components/SuperAdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 import { useAuth } from "@/app/context/AuthContext";
 import { dataStore } from "@/app/lib/dataStore";
-import { Users, FileCheck, XCircle, TrendingUp, AlertCircle, Ship } from "lucide-react";
+
+import {
+  Users,
+  FileCheck,
+  XCircle,
+  TrendingUp,
+  AlertCircle,
+  Ship,
+  Search,
+  RefreshCcw,
+} from "lucide-react";
+
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  BarChart,
+  Bar,
+} from "recharts";
+
 
 export default function SuperAdminDashboard() {
   const { email } = useAuth();
-  const allCrews = dataStore.getAllCrews();
-  const approvedCount = allCrews.filter((c) => c.status === "approved").length;
-  const pendingCount = allCrews.filter((c) => c.status === "pending").length;
-  const disapprovedCount = allCrews.filter((c) => c.status === "disapproved").length;
+
+  const [crews, setCrews] = useState(dataStore.getAllCrews());
+
+  // Filters
+  const [statusFilter, setStatusFilter] = useState<"all" | "approved" | "pending" | "disapproved">("all");
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
+  const [search, setSearch] = useState("");
+
+  // Real-time update simulation (auto-refresh)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCrews(dataStore.getAllCrews());
+    }, 3000); // refresh every 3 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  const filteredCrews = useMemo(() => {
+    return crews.filter((crew) => {
+      // Status filter
+      if (statusFilter !== "all" && crew.status !== statusFilter) return false;
+
+      // Date filter
+      const createdAt = new Date(crew.createdAt).getTime();
+      if (fromDate && createdAt < new Date(fromDate).getTime()) return false;
+      if (toDate && createdAt > new Date(toDate).getTime()) return false;
+
+      // Search filter
+      const keyword = search.toLowerCase();
+      if (
+        !crew.name.toLowerCase().includes(keyword) &&
+        !crew.rank.toLowerCase().includes(keyword) &&
+        !crew.vesselName.toLowerCase().includes(keyword)
+      ) return false;
+
+      return true;
+    });
+  }, [crews, statusFilter, fromDate, toDate, search]);
+
+  const approvedCount = filteredCrews.filter((c) => c.status === "approved").length;
+  const pendingCount = filteredCrews.filter((c) => c.status === "pending").length;
+  const disapprovedCount = filteredCrews.filter((c) => c.status === "disapproved").length;
+
+  const COLORS = [
+    "var(--theme-blue)",
+    "var(--theme-amber)",
+    "var(--theme-red)",
+    "var(--theme-purple)",
+  ];
+
+  // Monthly trend
+  const lineData = useMemo(() => {
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const data = months.map((m) => ({ month: m, value: 0 }));
+
+    filteredCrews.forEach((crew) => {
+      const idx = new Date(crew.createdAt).getMonth();
+      data[idx].value += 1;
+    });
+
+    return data;
+  }, [filteredCrews]);
+
+  // Top Vessels
+  const vesselStats = useMemo(() => {
+    const map: Record<string, number> = {};
+    filteredCrews.forEach((crew) => {
+      const vessel = crew.vesselName || "Unknown";
+      map[vessel] = (map[vessel] || 0) + 1;
+    });
+
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, value]) => ({ name, value }));
+  }, [filteredCrews]);
+
+  // Expiring certificates (fake data for demo)
+  const expiring = useMemo(() => {
+    return filteredCrews
+      .filter((c) => c.certificates?.some((cert) => new Date(cert.validUntil) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)))
+      .slice(0, 5);
+  }, [filteredCrews]);
 
   return (
     <ProtectedRoute requiredRole="super-admin">
-      <div className="flex">
-        <SuperAdminSidebar />
-        <div className="flex-1 bg-background min-h-screen">
-          {/* Header */}
-          <div className="bg-card border-b border-border p-6">
-            <h1 className="text-3xl font-extrabold text-accent">Dashboard</h1>
-            <p className="text-muted-foreground mt-1">Welcome back, {email}</p>
+      <div className="min-h-screen flex dashboard-bg">
+        {/* Sidebar */}
+        <div className="fixed left-0 top-0 h-full z-20">
+          <SuperAdminSidebar />
+        </div>
+
+        {/* Main */}
+        <div className="dashboard-main w-full">
+          <div className="bg-[var(--card)] border-b border-[var(--border)] p-6">
+            <h1 className="text-3xl font-extrabold text-[var(--foreground)]">
+              Dashboard
+            </h1>
+            <p className="text-[var(--muted-foreground)] mt-1">
+              Welcome back, {email}
+            </p>
           </div>
 
-          {/* Content */}
-          <div className="p-6">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {/* Total Crew */}
-              <div className="bg-card rounded-lg shadow-sm p-6 border-l-4 border-primary hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-sm font-semibold">Total Crew</p>
-                    <p className="text-3xl font-extrabold text-accent mt-2">{allCrews.length}</p>
-                  </div>
-                  <Users className="w-12 h-12 text-primary opacity-20" />
+          {/* Filters + Search */}
+          <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <select
+              className="p-3 rounded-lg border border-[var(--border)] bg-[var(--card)]"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+            >
+              <option value="all">All Status</option>
+              <option value="approved">Approved</option>
+              <option value="pending">Pending</option>
+              <option value="disapproved">Disapproved</option>
+            </select>
+
+            <input
+              type="date"
+              className="p-3 rounded-lg border border-[var(--border)] bg-[var(--card)]"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+            />
+
+            <input
+              type="date"
+              className="p-3 rounded-lg border border-[var(--border)] bg-[var(--card)]"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+            />
+
+            <div className="relative">
+              <input
+                type="text"
+                className="w-full p-3 rounded-lg border border-[var(--border)] bg-[var(--card)]"
+                placeholder="Search by name, rank, vessel..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <Search className="absolute right-3 top-3 w-5 h-5 text-[var(--muted-foreground)]" />
+            </div>
+          </div>
+
+          {/* Stats Cards (Aligned) */}
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatCard title="Total Crew" value={filteredCrews.length} color="var(--theme-blue)" icon={<Users className="w-10 h-10" />} />
+            <StatCard title="Pending" value={pendingCount} color="var(--theme-amber)" icon={<TrendingUp className="w-10 h-10" />} />
+            <StatCard title="Approved" value={approvedCount} color="var(--theme-purple)" icon={<FileCheck className="w-10 h-10" />} />
+            <StatCard title="Disapproved" value={disapprovedCount} color="var(--theme-red)" icon={<XCircle className="w-10 h-10" />} />
+          </div>
+
+          {/* Analytics Charts */}
+          <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Monthly Trend */}
+            <div className="bg-[var(--card)] rounded-2xl shadow-sm p-6 border border-[var(--border)]">
+              <h2 className="text-xl font-bold text-[var(--foreground)] mb-4">
+                Monthly Applications
+              </h2>
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={lineData}>
+                  <XAxis dataKey="month" stroke="var(--muted-foreground)" />
+                  <YAxis stroke="var(--muted-foreground)" />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="value" stroke="var(--theme-blue)" strokeWidth={3} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Status Pie */}
+            <div className="bg-[var(--card)] rounded-2xl shadow-sm p-6 border border-[var(--border)]">
+              <h2 className="text-xl font-bold text-[var(--foreground)] mb-4">
+                Status Distribution
+              </h2>
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: "Approved", value: approvedCount },
+                      { name: "Pending", value: pendingCount },
+                      { name: "Disapproved", value: disapprovedCount },
+                    ]}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    label
+                  >
+                    {COLORS.slice(0, 3).map((c, i) => (
+                      <Cell key={i} fill={c} />
+                    ))}
+                  </Pie>
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Top Vessels */}
+            <div className="bg-[var(--card)] rounded-2xl shadow-sm p-6 border border-[var(--border)]">
+              <h2 className="text-xl font-bold text-[var(--foreground)] mb-4">
+                Top Vessels
+              </h2>
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={vesselStats}>
+                  <XAxis dataKey="name" stroke="var(--muted-foreground)" />
+                  <YAxis stroke="var(--muted-foreground)" />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="var(--theme-amber)" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Live Activity + Expiring */}
+          <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-[var(--card)] rounded-2xl shadow-sm p-6 border border-[var(--border)]">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-[var(--foreground)]">
+                  Live Activity Feed
+                </h2>
+                <div className="flex items-center gap-2">
+                  <RefreshCcw className="w-5 h-5 text-[var(--muted-foreground)]" />
+                  <span className="text-xs text-[var(--muted-foreground)]">Auto-updates every 3s</span>
                 </div>
               </div>
-
-              {/* Pending Applications */}
-              <div className="bg-card rounded-lg shadow-sm p-6 border-l-4 border-blue-500 hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-sm font-semibold">Pending Review</p>
-                    <p className="text-3xl font-extrabold text-accent mt-2">{pendingCount}</p>
+              <div className="space-y-3">
+                {filteredCrews.slice(0, 5).map((c) => (
+                  <div key={c.id} className="p-3 rounded-lg border border-[var(--border)] bg-[var(--background)]">
+                    <div className="flex justify-between">
+                      <span className="font-bold text-[var(--foreground)]">{c.name}</span>
+                      <span className="text-xs text-[var(--muted-foreground)]">{c.status}</span>
+                    </div>
+                    <div className="text-xs text-[var(--muted-foreground)]">
+                      {c.rank} • {c.vesselName}
+                    </div>
                   </div>
-                  <TrendingUp className="w-12 h-12 text-blue-500 opacity-20" />
-                </div>
-              </div>
-
-              {/* Approved */}
-              <div className="bg-card rounded-lg shadow-sm p-6 border-l-4 border-green-600 hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-sm font-semibold">Approved Crew</p>
-                    <p className="text-3xl font-extrabold text-accent mt-2">{approvedCount}</p>
-                  </div>
-                  <FileCheck className="w-12 h-12 text-green-600 opacity-20" />
-                </div>
-              </div>
-
-              {/* Disapproved */}
-              <div className="bg-card rounded-lg shadow-sm p-6 border-l-4 border-red-600 hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-sm font-semibold">Disapproved</p>
-                    <p className="text-3xl font-extrabold text-accent mt-2">{disapprovedCount}</p>
-                  </div>
-                  <XCircle className="w-12 h-12 text-red-600 opacity-20" />
-                </div>
+                ))}
               </div>
             </div>
 
-            {/* Two Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* System Overview */}
-              <div className="bg-card rounded-lg shadow-sm p-6 border border-border">
-                <h2 className="text-xl font-extrabold text-accent mb-4">System Overview</h2>
-                <p className="text-muted-foreground mb-4">Full system access with recruitment and crewing management capabilities.</p>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-3 bg-secondary rounded-lg border border-border">
-                    <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span className="text-sm text-accent font-semibold">Manage all recruitment applications</span>
+            <div className="bg-[var(--card)] rounded-2xl shadow-sm p-6 border border-[var(--border)]">
+              <h2 className="text-xl font-bold text-[var(--foreground)] mb-4">
+                Certificates Expiring Soon
+              </h2>
+              <div className="space-y-3">
+                {expiring.map((c) => (
+                  <div key={c.id} className="p-3 rounded-lg border border-[var(--border)] bg-[var(--background)]">
+                    <div className="font-bold text-[var(--foreground)]">{c.name}</div>
+                    <div className="text-xs text-[var(--muted-foreground)]">
+                      Expiring soon • {c.certificates[0]?.name}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 p-3 bg-secondary rounded-lg border border-border">
-                    <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span className="text-sm text-accent font-semibold">Full crew database access</span>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-secondary rounded-lg border border-border">
-                    <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span className="text-sm text-accent font-semibold">Assign vessels to crew members</span>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-secondary rounded-lg border border-border">
-                    <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span className="text-sm text-accent font-semibold">Monitor certificate expiry dates</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick Stats */}
-              <div className="bg-card rounded-lg shadow-sm p-6 border border-border">
-                <h2 className="text-xl font-extrabold text-accent mb-4">System Statistics</h2>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
-                    <span className="text-accent font-semibold">Approval Rate</span>
-                    <span className="text-2xl font-extrabold text-green-600">
-                      {allCrews.length > 0 ? Math.round((approvedCount / allCrews.length) * 100) : 0}%
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <span className="text-accent font-semibold">Pending Review</span>
-                    <span className="text-2xl font-extrabold text-blue-600">{pendingCount}</span>
-                  </div>
-                  <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200">
-                    <span className="text-accent font-semibold">Needs Attention</span>
-                    <span className="text-2xl font-extrabold text-red-600">{disapprovedCount}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Features Section */}
-            <div className="mt-8 bg-card rounded-lg shadow-sm p-6 border border-border">
-              <h2 className="text-xl font-extrabold text-accent mb-4">Available Modules</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-4 bg-secondary rounded-lg border border-border hover:shadow-md transition-shadow">
-                  <Users className="w-8 h-8 text-primary mb-2" />
-                  <h3 className="font-bold text-accent mb-1">Crew Applications</h3>
-                  <p className="text-xs text-muted-foreground">Review and manage all recruitment applications</p>
-                </div>
-                <div className="p-4 bg-secondary rounded-lg border border-border hover:shadow-md transition-shadow">
-                  <Ship className="w-8 h-8 text-green-600 mb-2" />
-                  <h3 className="font-bold text-accent mb-1">Vessel Assignment</h3>
-                  <p className="text-xs text-muted-foreground">Assign crews to vessels and manage transfers</p>
-                </div>
-                <div className="p-4 bg-secondary rounded-lg border border-border hover:shadow-md transition-shadow">
-                  <AlertCircle className="w-8 h-8 text-red-600 mb-2" />
-                  <h3 className="font-bold text-accent mb-1">Certificate Monitoring</h3>
-                  <p className="text-xs text-muted-foreground">Track expiring certificates and compliance</p>
-                </div>
-                <div className="p-4 bg-secondary rounded-lg border border-border hover:shadow-md transition-shadow">
-                  <FileCheck className="w-8 h-8 text-blue-600 mb-2" />
-                  <h3 className="font-bold text-accent mb-1">Crew Database</h3>
-                  <p className="text-xs text-muted-foreground">Access complete crew information and history</p>
-                </div>
+                ))}
               </div>
             </div>
           </div>
+
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+
+function StatCard({ title, value, color, icon }: any) {
+  return (
+    <div className="bg-[var(--card)] rounded-2xl shadow-sm p-6 border border-[var(--border)] hover:shadow-lg transition-shadow">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-[var(--muted-foreground)] text-sm font-semibold">{title}</p>
+          <p className="text-3xl font-extrabold text-[var(--foreground)] mt-2">{value}</p>
+        </div>
+        <div className="p-3 rounded-xl" style={{ background: `${color}20` }}>
+          <div style={{ color: color }}>{icon}</div>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -1,3 +1,5 @@
+import { ReactNode } from "react"; // Import ReactNode for index signature
+
 export type Certificate = {
   id: string;
   name: string;
@@ -24,10 +26,10 @@ export type VesselExperience = {
 };
 
 export interface CrewMember {
+  [x: string]: any;
   rank: any;
   id: string;
   createdAt: string;
-
   dateApplied: string;
   presentRank: string;
   prevSalary: string;
@@ -103,10 +105,7 @@ export interface CrewMember {
 
   vesselType: string;
 
-  // ✅ UPDATED STATUS
   status: "pending" | "proposed" | "approved" | "disapproved" | "fooled";
-
-  // ✅ REMARKS ADDED
   remarks: string;
 }
 
@@ -114,16 +113,55 @@ class DataStore {
   private crews: Map<string, CrewMember> = new Map();
   private nextId = 1;
 
-  addCrew(
-    crew: Omit<CrewMember, "id" | "createdAt" | "status">
-  ): CrewMember {
+  addCrew(crew: Omit<CrewMember, "id" | "createdAt" | "status">): CrewMember {
     const id = `crew-${this.nextId++}`;
 
+    // Provide default values for all required fields
     const newCrew: CrewMember = {
       ...crew,
       id,
       createdAt: new Date().toISOString(),
-      status: "pending", // DEFAULT STATUS
+      status: "pending", // Default status
+      rank: "", // Default empty string
+      dateApplied: "", // Default empty string
+      presentRank: "", // Default empty string
+      prevSalary: "", // Default empty string
+      province: "", // Default empty string
+      dateOfAvailability: "", // Default empty string
+      expectedSalary: "", // Default empty string
+      placeOfBirth: "", // Default empty string
+      numOfChildren: "", // Default empty string
+      religion: "", // Default empty string
+      nextOfKin: "", // Default empty string
+      nextOfKinAddress: "", // Default empty string
+      schoolAttended: "", // Default empty string
+      weight: "", // Default empty string
+      course: "", // Default empty string
+      yearGraduated: "", // Default empty string
+      bmi: "", // Default empty string
+      ishihara: "", // Default empty string
+      certificates: [], // Default empty array
+      vesselExperience: [], // Default empty array
+      fullName: "", // Default empty string
+      fathersName: "", // Default empty string
+      mothersName: "", // Default empty string
+      dateOfBirth: "", // Default empty string
+      age: 0, // Default to 0
+      nationality: "", // Default empty string
+      gender: "", // Default empty string
+      height: "", // Default empty string
+      uniformSize: "", // Default empty string
+      civilStatus: "", // Default empty string
+      mobileNumber: "", // Default empty string
+      emailAddress: "", // Default empty string
+      completeAddress: "", // Default empty string
+      highSchool: { schoolName: "", yearGraduated: "" }, // Default empty object
+      college: { schoolName: "", course: "", yearGraduated: "" }, // Default empty object
+      documents: [], // Default empty array
+      seaService: [], // Default empty array
+      medical: { certificateType: "", issuingClinic: "", dateIssued: "", expiryDate: "" }, // Default empty object
+      vesselType: "", // Default empty string
+      remarks: "", // Default empty string
     };
 
     this.crews.set(id, newCrew);
@@ -138,10 +176,7 @@ class DataStore {
     return Array.from(this.crews.values());
   }
 
-  updateCrew(
-    id: string,
-    updates: Partial<CrewMember>
-  ): CrewMember | undefined {
+  updateCrew(id: string, updates: Partial<CrewMember>): CrewMember | undefined {
     const crew = this.crews.get(id);
     if (crew) {
       const updated = { ...crew, ...updates };
@@ -151,7 +186,6 @@ class DataStore {
     return undefined;
   }
 
-  // ✅ NEW METHOD: UPDATE STATUS
   updateCrewStatus(id: string, status: CrewMember["status"]): CrewMember | undefined {
     const crew = this.crews.get(id);
     if (!crew) return undefined;

@@ -28,6 +28,20 @@ import {
   Legend,
 } from "recharts";
 
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { listenCrewApplications } from "@/app/lib/crewservice";
+
+/* =======================
+   TYPES
+======================= */
+type CrewStatus = "all" | "approved" | "pending" | "disapproved" | "fooled";
+
+/* =======================
+   CONSTANTS
+======================= */
+const ITEMS_PER_PAGE = 10;
+
 const THEME_COLORS = {
   green: "#10B981",
   amber: "#F59E0B",
@@ -43,98 +57,130 @@ const COLORS = [
   THEME_COLORS.purple,
 ];
 
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import { listenCrewApplications, updateCrewInFirestore } from "@/app/lib/crewservice";
+/* =======================
+   DATE HELPERS (FIX)
+======================= */
+const getTime = (value: any): number => {
+  if (!value) return 0;
+  if (value?.toDate) return value.toDate().getTime(); // Firestore Timestamp
+  if (value?.seconds) return value.seconds * 1000;   // Raw timestamp
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? 0 : d.getTime();
+};
 
-type CrewStatus = "all" | "approved" | "pending" | "disapproved" | "fooled";
+const formatDate = (value: any): string => {
+  const time = getTime(value);
+  if (!time) return "—";
+  return new Date(time).toLocaleDateString();
+};
 
+/* =======================
+   COMPONENT
+======================= */
 export default function AdminDashboard() {
   const { email } = useAuth();
 
   const [crews, setCrews] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState<CrewStatus>("all");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"name" | "status" | "date">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
   const [selectedCrew, setSelectedCrew] = useState<any>(null);
 
-  // 🔥 REALTIME FIRESTORE SYNC
+  /* =======================
+     FIRESTORE REALTIME
+  ======================= */
   useEffect(() => {
-    const unsubscribe = listenCrewApplications((data: any[]) => {
-      setCrews(data);
-    });
+    const unsubscribe = listenCrewApplications(setCrews);
     return () => unsubscribe();
   }, []);
 
-  // Filter + Sort + Pagination
+  /* =======================
+     FILTER + SORT
+  ======================= */
   const filteredCrews = useMemo(() => {
-    let list = crews;
+    let list = [...crews];
 
+    // Status
     if (statusFilter !== "all") {
       if (statusFilter === "pending") {
         list = list.filter(
-          (c) => c.status === "proposed" || c.status === "pending"
+          (c) => c.status === "pending" || c.status === "proposed"
         );
       } else {
         list = list.filter((c) => c.status === statusFilter);
       }
     }
 
+    // Date range
     if (startDate || endDate) {
       const start = startDate ? new Date(startDate).getTime() : -Infinity;
       const end = endDate ? new Date(endDate).getTime() : Infinity;
+
       list = list.filter((c) => {
-        const created = new Date(c.createdAt).getTime();
+        const created = getTime(c.createdAt);
         return created >= start && created <= end;
       });
     }
 
+    // Search
     if (searchQuery) {
       list = list.filter((c) =>
-        c.fullName.toLowerCase().includes(searchQuery.toLowerCase())
+        c.fullName?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
-    list = list.sort((a: any, b: any) => {
+    // Sort
+    list.sort((a, b) => {
       const dir = sortDir === "asc" ? 1 : -1;
       if (sortBy === "name") return a.fullName.localeCompare(b.fullName) * dir;
       if (sortBy === "status") return a.status.localeCompare(b.status) * dir;
-      return (
-        (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) *
-        dir
-      );
+      return (getTime(a.createdAt) - getTime(b.createdAt)) * dir;
     });
 
     return list;
   }, [crews, statusFilter, startDate, endDate, searchQuery, sortBy, sortDir]);
 
-  const totalPages = Math.ceil(filteredCrews.length / ITEMS_PER_PAGE);
-  const paginatedCrews = filteredCrews.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  /* =======================
+   PAGINATION (FIXED)
+======================= */
+const totalPages = Math.max(1, Math.ceil(filteredCrews.length / ITEMS_PER_PAGE));
 
+// Reset page when filters change
+useEffect(() => {
+  setCurrentPage(1);
+}, [statusFilter, startDate, endDate, searchQuery]);
+
+const paginatedCrews = filteredCrews.slice(
+  (currentPage - 1) * ITEMS_PER_PAGE,
+  currentPage * ITEMS_PER_PAGE
+);
+
+
+  /* =======================
+     COUNTS
+  ======================= */
   const approvedCount = filteredCrews.filter((c) => c.status === "approved").length;
   const pendingCount = filteredCrews.filter(
-    (c) => c.status === "proposed" || c.status === "pending"
+    (c) => c.status === "pending" || c.status === "proposed"
   ).length;
   const disapprovedCount = filteredCrews.filter((c) => c.status === "disapproved").length;
   const fooledCount = filteredCrews.filter((c) => c.status === "fooled").length;
 
-  // Chart Data
+  /* =======================
+     CHART DATA
+  ======================= */
   const trendData = filteredCrews
-    .map((crew) => ({ date: new Date(crew.createdAt).toLocaleDateString() }))
-    .reduce((acc, cur) => {
+    .map((c) => ({ date: formatDate(c.createdAt) }))
+    .reduce((acc: any[], cur) => {
       const found = acc.find((a) => a.date === cur.date);
-      if (found) found.total++;
+      if (found) found.total += 1;
       else acc.push({ date: cur.date, total: 1 });
       return acc;
-    }, [] as { date: string; total: number }[])
+    }, [])
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const pieData = [
@@ -144,211 +190,132 @@ export default function AdminDashboard() {
     { name: "Fooled", value: fooledCount },
   ];
 
-  // PDF Export
+  /* =======================
+     PDF EXPORT
+  ======================= */
   const exportPDF = () => {
     const doc = new jsPDF("landscape");
-    doc.setFontSize(16);
     doc.text("Crew Applications Report", 14, 20);
 
-    const tableData = filteredCrews.map((crew) => [
-      crew.fullName,
-      crew.status,
-      crew.emailAddress,
-      new Date(crew.createdAt).toLocaleDateString(),
-    ]);
-
     autoTable(doc, {
-      head: [["Name", "Status", "Email", "Date"]],
-      body: tableData,
       startY: 30,
-      theme: "grid",
+      head: [["Name", "Status", "Email", "Date"]],
+      body: filteredCrews.map((c) => [
+        c.fullName,
+        c.status,
+        c.emailAddress,
+        formatDate(c.createdAt),
+      ]),
     });
 
     doc.save("crew_report.pdf");
   };
 
-  const updateStatus = async (crewId: string, status: any) => {
-    await updateCrewInFirestore(crewId, { status });
-    setSelectedCrew(null);
-  };
-
+  /* =======================
+     RENDER
+  ======================= */
   return (
     <ProtectedRoute requiredRole="admin">
       <div className="flex">
         <AdminSidebar />
 
         <div className="flex-1 min-h-screen lg:ml-64 bg-[#f7f7ff]">
-          <div className="fixed top-0 left-0 right-0 z-20 lg:ml-64 bg-white border-b border-[#e5e7eb]">
-            <div className="flex items-center justify-between px-6 py-4">
-              <div className="flex items-center gap-3">
-                <Activity className="w-5 h-5 text-black/80" />
-                <h1 className="text-black font-bold text-lg">Admin Dashboard</h1>
-              </div>
-              <div className="text-black/70 text-sm">
-                Logged in as: <span className="text-black">{email}</span>
-              </div>
+          {/* HEADER */}
+          <div className="fixed top-0 left-0 right-0 lg:ml-64 bg-white border-b z-20">
+            <div className="flex justify-between px-6 py-4">
+              <h1 className="font-bold text-lg flex items-center gap-2">
+                <Activity className="w-5 h-5" /> Admin Dashboard
+              </h1>
+              <span className="text-sm text-gray-600">
+                Logged in as <b>{email}</b>
+              </span>
             </div>
           </div>
 
-          <div className="pt-20 px-6 pb-10">
-            {/* Filters */}
-            <div className="bg-white rounded-2xl shadow-sm p-6 border border-[#e5e7eb] mb-8">
-              <h2 className="text-black font-bold mb-4">Filters</h2>
-
+          <div className="pt-24 px-6 pb-10">
+            {/* FILTERS */}
+            <div className="bg-white rounded-2xl shadow-sm p-6 border mb-8">
+              <h2 className="font-bold mb-4">Filters</h2>
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div>
-                  <label className="text-black/70 text-sm">Status</label>
-                  <select
-                    className="w-full mt-2 bg-white border border-[#e5e7eb] rounded-xl p-3 text-black"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as any)}
-                  >
-                    <option value="all">All</option>
-                    <option value="approved">Approved</option>
-                    <option value="pending">Pending</option>
-                    <option value="disapproved">Disapproved</option>
-                    <option value="fooled">Fooled</option>
-                  </select>
-                </div>
+                <select
+                  className="border rounded-xl p-3"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as CrewStatus)}
+                >
+                  <option value="all">All</option>
+                  <option value="approved">Approved</option>
+                  <option value="pending">Pending</option>
+                  <option value="disapproved">Disapproved</option>
+                  <option value="fooled">Fooled</option>
+                </select>
 
-                <div>
-                  <label className="text-black/70 text-sm">Start Date</label>
+                <input type="date" className="border rounded-xl p-3" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                <input type="date" className="border rounded-xl p-3" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 text-gray-400" />
                   <input
-                    type="date"
-                    className="w-full mt-2 bg-white border border-[#e5e7eb] rounded-xl p-3 text-black"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    className="pl-10 border rounded-xl p-3 w-full"
+                    placeholder="Search name..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
 
-                <div>
-                  <label className="text-black/70 text-sm">End Date</label>
-                  <input
-                    type="date"
-                    className="w-full mt-2 bg-white border border-[#e5e7eb] rounded-xl p-3 text-black"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-black/70 text-sm">Search</label>
-                  <div className="relative mt-2">
-                    <Search className="absolute top-3 left-3 text-black/60" />
-                    <input
-                      className="w-full pl-10 bg-white border border-[#e5e7eb] rounded-xl p-3 text-black"
-                      placeholder="Search by name..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-black/70 text-sm">Actions</label>
-                  <button
-                    className="w-full bg-[#10B981] hover:bg-[#0f9b6f] text-black rounded-xl p-3 flex items-center justify-center gap-2"
-                    onClick={exportPDF}
-                  >
-                    <Download className="w-4 h-4" />
-                    Export to PDF
-                  </button>
-                </div>
+                <button
+                  onClick={exportPDF}
+                  className="bg-green-500 text-black rounded-xl p-3 flex items-center justify-center gap-2"
+                >
+                  <Download className="w-4 h-4" /> Export PDF
+                </button>
               </div>
             </div>
 
-            {/* Stats */}
+            {/* STATS */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-              <div className="bg-white rounded-2xl shadow-sm p-6 border border-[#e5e7eb]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-black/70 text-sm font-semibold">Total Crew</p>
-                    <p className="text-3xl font-extrabold text-black mt-2">
-                      {filteredCrews.length}
-                    </p>
+              {[
+                { label: "Total Crew", value: filteredCrews.length, icon: Users, color: "text-blue-600" },
+                { label: "Pending", value: pendingCount, icon: TrendingUp, color: "text-amber-500" },
+                { label: "Approved", value: approvedCount, icon: FileCheck, color: "text-green-500" },
+                { label: "Disapproved", value: disapprovedCount, icon: XCircle, color: "text-red-500" },
+                { label: "Fooled", value: fooledCount, icon: Activity, color: "text-purple-500" },
+              ].map((s) => (
+                <div key={s.label} className="bg-white rounded-2xl shadow-sm p-6 border">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-sm text-gray-500 font-semibold">{s.label}</p>
+                      <p className="text-3xl font-extrabold mt-2">{s.value}</p>
+                    </div>
+                    <s.icon className={`w-12 h-12 opacity-25 ${s.color}`} />
                   </div>
-                  <Users className="w-12 h-12 text-[#2563EB] opacity-25" />
                 </div>
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-sm p-6 border border-[#e5e7eb]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-black/70 text-sm font-semibold">Pending</p>
-                    <p className="text-3xl font-extrabold text-black mt-2">{pendingCount}</p>
-                  </div>
-                  <TrendingUp className="w-12 h-12 text-[#F59E0B] opacity-25" />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-sm p-6 border border-[#e5e7eb]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-black/70 text-sm font-semibold">Approved</p>
-                    <p className="text-3xl font-extrabold text-black mt-2">{approvedCount}</p>
-                  </div>
-                  <FileCheck className="w-12 h-12 text-[#10B981] opacity-25" />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-sm p-6 border border-[#e5e7eb]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-black/70 text-sm font-semibold">Disapproved</p>
-                    <p className="text-3xl font-extrabold text-black mt-2">{disapprovedCount}</p>
-                  </div>
-                  <XCircle className="w-12 h-12 text-[#EF4444] opacity-25" />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-sm p-6 border border-[#e5e7eb]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-black/70 text-sm font-semibold">Fooled</p>
-                    <p className="text-3xl font-extrabold text-black mt-2">{fooledCount}</p>
-                  </div>
-                  <Activity className="w-12 h-12 text-[#8B5CF6] opacity-25" />
-                </div>
-              </div>
+              ))}
             </div>
 
-            {/* Charts */}
+            {/* CHARTS (KEPT) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              <div className="bg-white rounded-2xl shadow-sm p-6 border border-[#e5e7eb]">
-                <h2 className="text-black font-bold mb-4">Application Trend</h2>
+              <div className="bg-white rounded-2xl shadow-sm p-6 border">
+                <h2 className="font-bold mb-4">Application Trend</h2>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={trendData}>
-                      <XAxis dataKey="date" stroke="#9CA3AF" />
-                      <YAxis stroke="#9CA3AF" />
-                      <Tooltip contentStyle={{ backgroundColor: "#1F2937", border: "none" }} />
-                      <Line
-                        type="monotone"
-                        dataKey="total"
-                        stroke={THEME_COLORS.blue}
-                        strokeWidth={3}
-                      />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="total" stroke={THEME_COLORS.blue} strokeWidth={3} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl shadow-sm p-6 border border-[#e5e7eb]">
-                <h2 className="text-black font-bold mb-4">Status Distribution</h2>
+              <div className="bg-white rounded-2xl shadow-sm p-6 border">
+                <h2 className="font-bold mb-4">Status Distribution</h2>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <RePieChart>
-                      <Pie
-                        data={pieData}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={90}
-                        label
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label>
+                        {pieData.map((_, i) => (
+                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
                         ))}
                       </Pie>
                       <Legend />
@@ -358,198 +325,65 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-          {/* Recent Applications Table */}
-          <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-gray-900 font-semibold text-lg">Recent Applications</h2>
-              <span className="text-gray-500 text-sm">
-                Page {currentPage} of {totalPages}
-              </span>
-            </div>
+            {/* RECENT APPLICATIONS TABLE */}
+            <div className="bg-white rounded-2xl shadow-md p-6 border">
+              <div className="flex justify-between mb-4">
+                <h2 className="font-semibold text-lg">Recent Applications</h2>
+                <span className="text-sm text-gray-500">
+                  Page {currentPage} of {totalPages}
+                </span>
+              </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="text-gray-500 text-sm">
-                    <th className="pb-3 pl-4 pr-6 text-left">
-                      <div
-                        className="flex items-center gap-2 cursor-pointer"
-                        onClick={() => {
-                          setSortBy("name");
-                          setSortDir(sortDir === "asc" ? "desc" : "asc");
-                        }}
-                      >
-                        Name <ArrowUpDown className="w-4 h-4 text-gray-400" />
-                      </div>
-                    </th>
-
-                    <th className="pb-3 pl-4 pr-6 text-left">
-                      <div
-                        className="flex items-center gap-2 cursor-pointer"
-                        onClick={() => {
-                          setSortBy("status");
-                          setSortDir(sortDir === "asc" ? "desc" : "asc");
-                        }}
-                      >
-                        Status <ArrowUpDown className="w-4 h-4 text-gray-400" />
-                      </div>
-                    </th>
-
-                    <th className="pb-3 pl-4 pr-6 text-left">Email</th>
-
-                    <th className="pb-3 pl-4 pr-6 text-left">
-                      <div
-                        className="flex items-center gap-2 cursor-pointer"
-                        onClick={() => {
-                          setSortBy("date");
-                          setSortDir(sortDir === "asc" ? "desc" : "asc");
-                        }}
-                      >
-                        Date <ArrowUpDown className="w-4 h-4 text-gray-400" />
-                      </div>
-                    </th>
+              <table className="w-full">
+                <thead className="text-gray-500 text-sm">
+                  <tr>
+                    <th className="text-left px-4 pb-3">Name</th>
+                    <th className="text-left px-4 pb-3">Status</th>
+                    <th className="text-left px-4 pb-3">Email</th>
+                    <th className="text-left px-4 pb-3">Date</th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {paginatedCrews.map((crew, idx) => (
+                  {paginatedCrews.map((c, i) => (
                     <tr
-                      key={idx}
-                      className="border-t border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors"
-                      onClick={() => setSelectedCrew(crew)}
+                      key={i}
+                      className="border-t hover:bg-gray-50 cursor-pointer"
+                      onClick={() => setSelectedCrew(c)}
                     >
-                      <td className="py-4 pl-4 pr-6 text-gray-900 font-medium">
-                        {crew.fullName}
-                      </td>
-
-                      <td className="py-4 pl-4 pr-6">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold tracking-wide ${
-                            crew.status === "approved"
-                              ? "bg-green-100 text-green-700"
-                              : crew.status === "proposed" || crew.status === "pending"
-                              ? "bg-yellow-100 text-yellow-700"
-                              : crew.status === "disapproved"
-                              ? "bg-red-100 text-red-700"
-                              : "bg-purple-100 text-purple-700"
-                          }`}
-                        >
-                          {crew.status}
-                        </span>
-                      </td>
-
-                      <td className="py-4 pl-4 pr-6 text-gray-700">
-                        {crew.emailAddress}
-                      </td>
-
-                      <td className="py-4 pl-4 pr-6 text-gray-500">
-                        {new Date(crew.createdAt).toLocaleDateString()}
+                      <td className="px-4 py-4 font-medium">{c.fullName}</td>
+                      <td className="px-4 py-4">{c.status}</td>
+                      <td className="px-4 py-4">{c.emailAddress}</td>
+                      <td className="px-4 py-4 text-gray-500">
+                        {formatDate(c.createdAt)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
 
-            <div className="flex justify-between items-center mt-5">
+              <div className="flex justify-between mt-4">
               <button
-                className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition"
-                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                 disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="px-4 py-2 bg-gray-100 rounded-xl"
               >
                 Previous
               </button>
 
               <button
-                className="px-5 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition"
-                onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-                disabled={currentPage === totalPages}
+                disabled={currentPage >= totalPages}
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
+                className="px-4 py-2 bg-blue-600 text-white rounded-xl"
               >
                 Next
               </button>
             </div>
-          </div>
-          </div>
-        </div>
-
-        {/* Modal */}
-        {selectedCrew && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
-            <div className="bg-white rounded-2xl shadow-xl w-11/12 md:w-3/4 p-6 border border-[#e5e7eb]">
-              <div className="flex justify-between items-center">
-                <h2 className="text-black font-bold text-lg">Crew Details</h2>
-                <button
-                  className="text-black/70 hover:text-black"
-                  onClick={() => setSelectedCrew(null)}
-                >
-                  Close
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div>
-                  <p className="text-black/70">Full Name</p>
-                  <p className="text-black font-semibold">{selectedCrew.fullName}</p>
-                </div>
-                <div>
-                  <p className="text-black/70">Email</p>
-                  <p className="text-black font-semibold">{selectedCrew.emailAddress}</p>
-                </div>
-                <div>
-                  <p className="text-black/70">Status</p>
-                  <p className="text-black font-semibold">{selectedCrew.status}</p>
-                </div>
-                <div>
-                  <p className="text-black/70">Created At</p>
-                  <p className="text-black font-semibold">
-                    {new Date(selectedCrew.createdAt).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <p className="text-black/70">Address</p>
-                <p className="text-black font-semibold">{selectedCrew.completeAddress}</p>
-              </div>
-
-              <div className="mt-4 flex gap-3">
-                <button
-                  className="px-4 py-2 bg-[#F59E0B] text-black rounded-xl"
-                  onClick={() => updateStatus(selectedCrew.id, "proposed")}
-                >
-                  Proposed
-                </button>
-                <button
-                  className="px-4 py-2 bg-[#10B981] text-black rounded-xl"
-                  onClick={() => updateStatus(selectedCrew.id, "approved")}
-                >
-                  Approved
-                </button>
-                <button
-                  className="px-4 py-2 bg-[#EF4444] text-black rounded-xl"
-                  onClick={() => updateStatus(selectedCrew.id, "disapproved")}
-                >
-                  Disapproved
-                </button>
-                <button
-                  className="px-4 py-2 bg-[#8B5CF6] text-black rounded-xl"
-                  onClick={() => updateStatus(selectedCrew.id, "fooled")}
-                >
-                  Fooled
-                </button>
-              </div>
-
-              <div className="mt-4">
-                <button
-                  className="px-4 py-2 bg-[#111827] text-white rounded-xl"
-                  onClick={() => setSelectedCrew(null)}
-                >
-                  Close
-                </button>
-              </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
     </ProtectedRoute>
   );
