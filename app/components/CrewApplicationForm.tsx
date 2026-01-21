@@ -6,7 +6,7 @@ import { dataStore, Certificate, CrewMember, VesselExperience } from "@/app/lib/
 import { addCrewToFirestore, updateCrewInFirestore } from "@/app/lib/crewservice";
 import { serverTimestamp } from "firebase/firestore";
 
-type CrewFormData = Omit<CrewMember, "id" | "createdAt" | "age"> & {
+type CrewFormData = Omit<CrewMember, "id" | "createdAt"> & {
   age: string;
 };
 
@@ -116,14 +116,14 @@ export function CrewApplicationForm({
   });
 
   useEffect(() => {
-    if (mode === "edit" && crew) {
-      setFormData((prev) => ({
-        ...prev,
-        ...(crew as any),
-        age: crew.age ? String(crew.age) : prev.age,
-      }));
-    }
-  }, [mode, crew]);
+  if (mode === "edit" && crew) {
+    setFormData((prev) => ({
+      ...prev,
+      ...crew,
+      age: crew.age ? String(crew.age) : prev.age,
+    }));
+  }
+}, [mode, crew]);
 
   const calculateAge = (dob: string) => {
     if (!dob) return "";
@@ -195,7 +195,7 @@ export function CrewApplicationForm({
   const removeDocument = (id: string) => {
     setFormData((prev) => ({
       ...prev,
-      documents: prev.documents.filter((d) => d.id !== id),
+      documents: prev.documents.filter((d: { id: string; }) => d.id !== id),
     }));
   };
 
@@ -206,7 +206,7 @@ export function CrewApplicationForm({
   ) => {
     setFormData((prev) => ({
       ...prev,
-      documents: prev.documents.map((d) =>
+      documents: prev.documents.map((d: { id: string; }) =>
         d.id === id ? { ...d, [field]: value } : d
       ),
     }));
@@ -215,14 +215,14 @@ export function CrewApplicationForm({
   const removeCertificate = (id: string) => {
     setFormData((prev) => ({
       ...prev,
-      certificates: prev.certificates.filter((c) => c.id !== id),
+      certificates: prev.certificates.filter((c: { id: string; }) => c.id !== id),
     }));
   };
 
   const updateCertificate = (id: string, field: keyof Certificate, value: string) => {
     setFormData((prev) => ({
       ...prev,
-      certificates: prev.certificates.map((c) =>
+      certificates: prev.certificates.map((c: { id: string; }) =>
         c.id === id ? { ...c, [field]: value } : c
       ),
     }));
@@ -256,7 +256,7 @@ export function CrewApplicationForm({
   const removeVesselExperience = (id: string) => {
     setFormData((prev) => ({
       ...prev,
-      vesselExperience: prev.vesselExperience.filter((v) => v.id !== id),
+      vesselExperience: prev.vesselExperience.filter((v: { id: string; }) => v.id !== id),
     }));
   };
 
@@ -267,21 +267,19 @@ export function CrewApplicationForm({
   ) => {
     setFormData((prev) => ({
       ...prev,
-      vesselExperience: prev.vesselExperience.map((v) =>
+      vesselExperience: prev.vesselExperience.map((v: { id: string; }) =>
         v.id === id ? { ...v, [field]: value } : v
       ),
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
   const payload = {
-  ...formData,
-  age: Number(formData.age),
-};
-
-await addCrewToFirestore(payload);
+    ...formData,
+    age: Number(formData.age),
+  };
 
   try {
     if (mode === "edit" && crew?.id) {
@@ -638,7 +636,7 @@ await addCrewToFirestore(payload);
             </div>
 
             <div className="space-y-3">
-              {formData.documents.map((doc) => (
+              {formData.documents.map((doc: { id: string; name: string | number | readonly string[] | undefined; placeIssued: string | number | readonly string[] | undefined; dateIssued: string | number | readonly string[] | undefined; expiryDate: string | number | readonly string[] | undefined; }) => (
                 <div
                   key={doc.id}
                   className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end"
@@ -713,7 +711,7 @@ await addCrewToFirestore(payload);
             </div>
 
             <div className="space-y-3">
-              {formData.certificates.map((cert) => (
+              {formData.certificates.map((cert: { id: string; name: string | number | readonly string[] | undefined; number: string | number | readonly string[] | undefined; dateIssued: string | number | readonly string[] | undefined; validUntil: string | number | readonly string[] | undefined; }) => (
                 <div key={cert.id} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
                   <select
                     value={cert.name}
@@ -773,7 +771,7 @@ await addCrewToFirestore(payload);
             </div>
 
             <div className="space-y-3">
-              {formData.vesselExperience.map((v) => (
+              {formData.vesselExperience.map((v: { id: string; manningCompany: string | number | readonly string[] | undefined; principal: string | number | readonly string[] | undefined; rank: string | number | readonly string[] | undefined; vesselName: string | number | readonly string[] | undefined; flag: string | number | readonly string[] | undefined; vesselType: string | number | readonly string[] | undefined; grt: string | number | readonly string[] | undefined; engineMaker: string | number | readonly string[] | undefined; trading: string | number | readonly string[] | undefined; route: string | number | readonly string[] | undefined; signedOn: string | number | readonly string[] | undefined; signedOff: string | number | readonly string[] | undefined; causeOfDischarge: string | number | readonly string[] | undefined; }) => (
                 <div key={v.id} className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <input
                     value={v.manningCompany}

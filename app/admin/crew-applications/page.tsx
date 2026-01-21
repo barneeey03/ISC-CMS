@@ -52,6 +52,11 @@ export default function CrewApplications() {
     refreshCrews();
   }, [refreshCrews]);
 
+  // RESET PAGE WHEN FILTER OR SEARCH CHANGES
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, statusFilter]);
+
   const handleProposed = async (id: string) => {
     await updateCrewInFirestore(id, { status: "proposed" });
     await refreshCrews();
@@ -72,6 +77,13 @@ export default function CrewApplications() {
     } else {
       await updateCrewInFirestore(id, { status: "disapproved" });
     }
+    await refreshCrews();
+    setSelectedCrew(null);
+    setStatusFilter("all");
+  };
+
+  const handleFooled = async (id: string) => {
+    await updateCrewInFirestore(id, { status: "fooled" });
     await refreshCrews();
     setSelectedCrew(null);
     setStatusFilter("all");
@@ -187,9 +199,7 @@ export default function CrewApplications() {
               <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg shadow-sm border">
                 <select
                   value={statusFilter}
-                  onChange={(e) =>
-                    setStatusFilter(e.target.value as any)
-                  }
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
                   className="w-full outline-none text-sm text-gray-700"
                 >
                   <option value="all">All Status</option>
@@ -226,25 +236,51 @@ export default function CrewApplications() {
               <table className="min-w-full divide-y">
                 <thead className="bg-blue-200">
                   <tr>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Rank</th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Name</th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Vessel Type</th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Age</th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Email</th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Status</th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Remarks</th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">Action</th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
+                      Rank
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
+                      Name
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
+                      Vessel Type
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
+                      Age
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
+                      Email
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
+                      Remarks
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
+                      Action
+                    </th>
                   </tr>
                 </thead>
 
                 <tbody className="divide-y bg-white">
                   {paginatedCrews.map((crew) => (
                     <tr key={crew.id} className="hover:bg-blue-50">
-                      <td className="px-6 py-4 text-center text-gray-600">{crew.presentRank}</td>
-                      <td className="px-6 py-4 text-center font-medium text-gray-800">{crew.fullName}</td>
-                      <td className="px-6 py-4 text-center text-gray-600">{crew.vesselType}</td>
-                      <td className="px-6 py-4 text-center text-gray-600">{getAge(crew.dateOfBirth)}</td>
-                      <td className="px-6 py-4 text-center text-gray-600">{crew.emailAddress}</td>
+                      <td className="px-6 py-4 text-center text-gray-600">
+                        {crew.presentRank}
+                      </td>
+                      <td className="px-6 py-4 text-center font-medium text-gray-800">
+                        {crew.fullName}
+                      </td>
+                      <td className="px-6 py-4 text-center text-gray-600">
+                        {crew.vesselType}
+                      </td>
+                      <td className="px-6 py-4 text-center text-gray-600">
+                        {getAge(crew.dateOfBirth)}
+                      </td>
+                      <td className="px-6 py-4 text-center text-gray-600">
+                        {crew.emailAddress}
+                      </td>
 
                       <td className="px-6 py-4 text-center">
                         <span
@@ -336,9 +372,7 @@ export default function CrewApplications() {
               onApprove={handleApprove}
               onDisapprove={handleDisapprove}
               onProposed={handleProposed}
-              onFooled={function (id: string): void {
-                throw new Error("Function not implemented.");
-              }}
+              onFooled={handleFooled}
             />
           )}
 

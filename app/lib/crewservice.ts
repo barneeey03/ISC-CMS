@@ -30,6 +30,7 @@ export async function addCrewToFirestore(
   return docRef.id;
 }
 
+
 // Update crew
 export async function updateCrewInFirestore(
   id: string,
