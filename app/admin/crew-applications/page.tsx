@@ -35,6 +35,13 @@ export default function CrewApplications() {
   const [page, setPage] = useState(1);
   const perPage = 8;
 
+  const handleProposed = (id: string) => {
+  dataStore.updateCrew(id, { status: "proposed" });
+  refreshCrews();
+  setSelectedCrew(null);
+};
+
+
   const refreshCrews = useCallback(() => {
     setCrews(dataStore.getAllCrews());
   }, []);
@@ -213,7 +220,7 @@ export default function CrewApplications() {
                       className={`px-3 py-1 rounded-full text-xs font-semibold
                         ${crew.status === "approved"
                           ? "bg-green-100 text-green-700"
-                          : crew.status === "pending"
+                          : crew.status === "proposed"
                           ? "bg-yellow-100 text-yellow-700"
                           : "bg-red-100 text-red-700"}`}
                     >
@@ -286,13 +293,15 @@ export default function CrewApplications() {
           </div>
 
           {selectedCrew && (
-            <CrewDetailsModal
-              crew={selectedCrew}
-              onClose={() => setSelectedCrew(null)}
-              onApprove={handleApprove}
-              onDisapprove={handleDisapprove}
-            />
-          )}
+          <CrewDetailsModal
+            crew={selectedCrew}
+            onClose={() => setSelectedCrew(null)}
+            onApprove={handleApprove}
+            onDisapprove={handleDisapprove}
+            onProposed={handleProposed}
+          />
+        )}
+
 
           {showAddForm && (
             <CrewApplicationForm

@@ -9,21 +9,20 @@ export function CrewDetailsModal({
   onClose,
   onApprove,
   onDisapprove,
+  onProposed,
 }: {
   crew: CrewMember;
   onClose: () => void;
   onApprove: (id: string) => void;
   onDisapprove: (id: string) => void;
+  onProposed: (id: string) => void;
 }) {
+
   const [openSection, setOpenSection] = useState<string | null>("basic");
 
   const toggleSection = (section: string) => {
     setOpenSection((prev) => (prev === section ? null : section));
   };
-
-  function onUpdateStatus(id: string, arg1: string): void {
-    throw new Error("Function not implemented.");
-  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -36,36 +35,36 @@ export function CrewDetailsModal({
         </div>
 
         <div className="p-6 space-y-6">
-
+          
           {/* ====== ACTION BUTTONS ====== */}
-         <div className="flex gap-3 mt-4 justify-end">
-          {crew.status !== "proposed" && (
-            <button
-              onClick={() => onUpdateStatus(crew.id, "proposed")}
-              className="px-4 py-2 rounded-lg bg-yellow-400 text-white font-semibold"
-            >
-              Proposed
-            </button>
-          )}
+          <div className="flex gap-3 mt-4 justify-end">
+            {crew.status !== "proposed" && (
+              <button
+                onClick={() => onProposed(crew.id)}
+                className="px-4 py-2 rounded-lg bg-yellow-400 text-white font-semibold"
+              >
+                Proposed
+              </button>
+            )}
 
-          {crew.status !== "approved" && (
-            <button
-              onClick={() => onUpdateStatus(crew.id, "approved")}
-              className="px-4 py-2 rounded-lg bg-green-500 text-white font-semibold"
-            >
-              Approve
-            </button>
-          )}
+            {crew.status !== "approved" && (
+              <button
+                onClick={() => onApprove(crew.id)}
+                className="px-4 py-2 rounded-lg bg-green-500 text-white font-semibold"
+              >
+                Approve
+              </button>
+            )}
 
-          {crew.status !== "disapproved" && (
-            <button
-              onClick={() => onUpdateStatus(crew.id, "disapproved")}
-              className="px-4 py-2 rounded-lg bg-red-500 text-white font-semibold"
-            >
-              Disapprove
-            </button>
-          )}
-        </div>
+            {crew.status !== "disapproved" && (
+              <button
+                onClick={() => onDisapprove(crew.id)}
+                className="px-4 py-2 rounded-lg bg-red-500 text-white font-semibold"
+              >
+                Disapprove
+              </button>
+            )}
+          </div>
 
           {/* ====== DETAILS SECTIONS ====== */}
           <Section
@@ -136,59 +135,58 @@ export function CrewDetailsModal({
           </Section>
 
           <Section
-          title="For Office Use"
-          isOpen={openSection === "office"}
-          onToggle={() => toggleSection("office")}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Detail label="Height" value={crew.height} />
-            <Detail label="Weight" value={crew.weight} />
-            <Detail label="BMI" value={crew.bmi} />
-            <Detail label="Ishihara Test" value={crew.ishihara} />
-          </div>
-        </Section>
-
-        <Section
-          title="Documents"
-          isOpen={openSection === "documents"}
-          onToggle={() => toggleSection("documents")}
-        >
-          {crew.documents.length === 0 ? (
-            <p className="text-sm text-gray-600">No documents added.</p>
-          ) : (
-            <div className="space-y-2">
-              {crew.documents.map((d) => (
-                <div
-                  key={d.id}
-                  className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 border rounded-lg"
-                >
-                  <Detail label="Document" value={d.name} />
-                  <Detail label="Number" value={d.placeIssued} />
-                  <Detail label="Issued" value={d.dateIssued} />
-                  <Detail label="Expiry" value={d.expiryDate} />
-                </div>
-              ))}
+            title="For Office Use"
+            isOpen={openSection === "office"}
+            onToggle={() => toggleSection("office")}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Detail label="Height" value={crew.height} />
+              <Detail label="Weight" value={crew.weight} />
+              <Detail label="BMI" value={crew.bmi} />
+              <Detail label="Ishihara Test" value={crew.ishihara} />
             </div>
-          )}
-        </Section>
+          </Section>
 
           <Section
-          title="Medical"
-          isOpen={openSection === "medical"}
-          onToggle={() => toggleSection("medical")}
-        >
-          {crew.medical ? (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Detail label="Certificate Type" value={crew.medical.certificateType} />
-              <Detail label="Issuing Clinic" value={crew.medical.issuingClinic} />
-              <Detail label="Date Issued" value={crew.medical.dateIssued} />
-              <Detail label="Expiry Date" value={crew.medical.expiryDate} />
-            </div>
-          ) : (
-            <p className="text-sm text-gray-600">No medical record.</p>
-          )}
-        </Section>
+            title="Documents"
+            isOpen={openSection === "documents"}
+            onToggle={() => toggleSection("documents")}
+          >
+            {crew.documents.length === 0 ? (
+              <p className="text-sm text-gray-600">No documents added.</p>
+            ) : (
+              <div className="space-y-2">
+                {crew.documents.map((d) => (
+                  <div
+                    key={d.id}
+                    className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 border rounded-lg"
+                  >
+                    <Detail label="Document" value={d.name} />
+                    <Detail label="Number" value={d.placeIssued} />
+                    <Detail label="Issued" value={d.dateIssued} />
+                    <Detail label="Expiry" value={d.expiryDate} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
 
+          <Section
+            title="Medical"
+            isOpen={openSection === "medical"}
+            onToggle={() => toggleSection("medical")}
+          >
+            {crew.medical ? (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Detail label="Certificate Type" value={crew.medical.certificateType} />
+                <Detail label="Issuing Clinic" value={crew.medical.issuingClinic} />
+                <Detail label="Date Issued" value={crew.medical.dateIssued} />
+                <Detail label="Expiry Date" value={crew.medical.expiryDate} />
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600">No medical record.</p>
+            )}
+          </Section>
 
           <Section
             title="Certificates"
@@ -245,8 +243,9 @@ export function CrewDetailsModal({
                 ))}
               </div>
             )}
-           </Section>
-            <Section
+          </Section>
+
+          <Section
             title="Remarks"
             isOpen={openSection === "remarks"}
             onToggle={() => toggleSection("remarks")}
