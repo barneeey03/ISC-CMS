@@ -469,6 +469,13 @@ export function CrewApplicationForm({
                 placeholder="Religion"
               />
               <input
+                name="nationality"
+                value={formData.nationality}
+                onChange={handleInputChange}
+                className={inputStyle}
+                placeholder="Nationality"
+              />
+              <input
                 name="uniformSize"
                 value={formData.uniformSize}
                 onChange={handleInputChange}
