@@ -46,6 +46,12 @@ const STATUS_STYLE: Record<string, { color: string; bg: string }> = {
 const getStatusStyle = (status: string) =>
   STATUS_STYLE[status] ?? { color: "#64748B", bg: "#CBD5E122" };
 
+// Generate unique id (no duplicates)
+const createUID = () =>
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random()}`;
+
 export default function SuperAdminDashboard() {
   const { email } = useAuth();
 
@@ -71,28 +77,30 @@ export default function SuperAdminDashboard() {
         return old && old.status !== x.status;
       });
 
+      // Add ALL new items as notifications
       if (newItems.length > 0) {
-        setNotifications((prev) => [
-          {
-            id: newItems[0].id,
-            message: `📌 New application received: ${newItems[0].fullName}`,
-            time: new Date().toLocaleTimeString(),
-            read: false,
-          },
-          ...prev,
-        ]);
+        const newNotifs = newItems.map((item) => ({
+          uid: createUID(),
+          appId: item.id,
+          message: `📌 New application received: ${item.fullName}`,
+          time: new Date().toLocaleTimeString(),
+          read: false,
+        }));
+
+        setNotifications((prev) => [...newNotifs, ...prev]);
       }
 
+      // Add ALL status changes as notifications
       if (statusChanged.length > 0) {
-        setNotifications((prev) => [
-          {
-            id: statusChanged[0].id,
-            message: `🔄 Status updated: ${statusChanged[0].fullName} is now ${statusChanged[0].status}`,
-            time: new Date().toLocaleTimeString(),
-            read: false,
-          },
-          ...prev,
-        ]);
+        const statusNotifs = statusChanged.map((item) => ({
+          uid: createUID(),
+          appId: item.id,
+          message: `🔄 Status updated: ${item.fullName} is now ${item.status}`,
+          time: new Date().toLocaleTimeString(),
+          read: false,
+        }));
+
+        setNotifications((prev) => [...statusNotifs, ...prev]);
       }
 
       prevCrewsRef.current = list;
@@ -107,10 +115,18 @@ export default function SuperAdminDashboard() {
     [notifications]
   );
 
-  const markAsRead = (id: string) => {
+  const markAsRead = (uid: string) => {
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      prev.map((n) => (n.uid === uid ? { ...n, read: true } : n))
     );
+  };
+
+  const markAllAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const clearNotifications = () => {
+    setNotifications([]);
   };
 
   const [statusFilter, setStatusFilter] =
@@ -253,17 +269,34 @@ export default function SuperAdminDashboard() {
 
               {showNotif && (
                 <div className="absolute right-0 mt-2 w-80 bg-white border rounded-lg shadow-lg z-50">
-                  <div className="p-3 border-b font-bold">Notifications</div>
+                  <div className="p-3 border-b font-bold flex justify-between items-center">
+                    <span>Notifications</span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={markAllAsRead}
+                        className="text-xs px-2 py-1 rounded bg-blue-50 hover:bg-blue-100"
+                      >
+                        Mark all read
+                      </button>
+                      <button
+                        onClick={clearNotifications}
+                        className="text-xs px-2 py-1 rounded bg-red-50 hover:bg-red-100"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="max-h-60 overflow-y-auto">
                     {notifications.length === 0 ? (
                       <div className="p-3 text-sm text-slate-600">
                         No notifications
                       </div>
                     ) : (
-                      notifications.map((n: any) => (
+                      notifications.map((n: any, idx: number) => (
                         <div
-                          key={n.id}
-                          onClick={() => markAsRead(n.id)}
+                          key={`${n.uid}-${idx}`}
+                          onClick={() => markAsRead(n.uid)}
                           className={`p-3 border-b hover:bg-blue-50 cursor-pointer ${
                             n.read ? "bg-white" : "bg-blue-50"
                           }`}
