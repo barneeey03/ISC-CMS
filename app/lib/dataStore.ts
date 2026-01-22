@@ -110,7 +110,7 @@ export interface CrewMember {
   principal?: string;
   expiryDate?: string;
 
-  status: "pending" | "proposed" | "approved" | "disapproved" | "fooled";
+  status: "pending" | "proposed" | "approved" | "disapproved" | "fooled" | "assigned";
   remarks: string;
 }
 

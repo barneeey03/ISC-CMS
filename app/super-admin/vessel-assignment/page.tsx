@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { SuperAdminSidebar } from "@/app/components/SuperAdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
-import { CrewMember } from "@/app/lib/dataStore";
+import type { CrewMember } from "@/app/lib/dataStore";
 import { Search, Ship, X, Edit2, Trash2 } from "lucide-react";
 
 import {
@@ -59,7 +59,14 @@ export default function VesselAssignment() {
   const [page, setPage] = useState(1);
   const perPage = 6;
 
-  // Fetch crews
+  // ===== Helper: Status Label =====
+  const getStatusLabel = (status: string | undefined) => {
+    if (!status) return "—";
+    if (status === "assigned") return "Active";
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  // ===== Fetch crews =====
   useEffect(() => {
     const crewRef = collection(db, "crewApplications");
     const unsubscribe = onSnapshot(crewRef, (snapshot) => {
@@ -76,7 +83,7 @@ export default function VesselAssignment() {
     return () => unsubscribe();
   }, []);
 
-  // Live listen to assignments collection in Firestore
+  // ===== Live listen to assignments collection =====
   useEffect(() => {
     const q = query(
       collection(db, "vesselAssignments"),
@@ -97,6 +104,7 @@ export default function VesselAssignment() {
     return () => unsubscribe();
   }, []);
 
+  // ===== Filter crews =====
   const filteredCrews = useMemo(() => {
     const filtered = crews.filter(
       (c) =>
@@ -117,14 +125,14 @@ export default function VesselAssignment() {
     });
   }, [crews, crewSearch]);
 
-  // pagination for assignments
+  // ===== pagination =====
   const totalPages = Math.ceil(vesselAssignments.length / perPage);
   const paginatedAssignments = vesselAssignments.slice(
     (page - 1) * perPage,
     page * perPage
   );
 
-  // Get current assignment info from crewExperience
+  // ===== Current assignment info =====
   const getCrewVesselInfo = (crew: CrewMember) => {
     const vessel = crew.vesselExperience?.[0];
     return {
@@ -134,7 +142,7 @@ export default function VesselAssignment() {
     };
   };
 
-  // When crew selected -> autofill current data
+  // ===== When crew selected -> autofill current data =====
   const handleCrewSelect = (id: string) => {
     const crew = crews.find((c) => c.id === id) || null;
     setSelectedCrew(crew);
@@ -148,7 +156,7 @@ export default function VesselAssignment() {
     }
   };
 
-  // Assign Vessel (Transfer)
+  // ===== Assign Vessel =====
   const handleAssignVessel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCrew) return;
@@ -181,7 +189,6 @@ export default function VesselAssignment() {
       status: "assigned",
     });
 
-
     // Save assignment to Firestore
     await addDoc(collection(db, "vesselAssignments"), {
       crewId: selectedCrew.id,
@@ -198,36 +205,37 @@ export default function VesselAssignment() {
     setShowModal(false);
   };
 
-// UNASSIGN
-const handleUnassign = async (assignmentId: string, crewId: string) => {
-  const confirmUnassign = confirm("Are you sure you want to unassign this crew?");
-  if (!confirmUnassign) return;
+  // ===== UNASSIGN =====
+  const handleUnassign = async (assignmentId: string, crewId: string) => {
+    const confirmUnassign = confirm(
+      "Are you sure you want to unassign this crew?"
+    );
+    if (!confirmUnassign) return;
 
-  // Delete assignment document
-  await deleteDoc(doc(db, "vesselAssignments", assignmentId));
+    // Delete assignment document
+    await deleteDoc(doc(db, "vesselAssignments", assignmentId));
 
-  // Clear crew vessel data
-  await updateCrewInFirestore(crewId, {
-    vesselExperience: [],
-    vesselName: "",
-    vesselType: "",
-    principal: "",
-    status: "approved",
-  });
+    // Clear crew vessel data
+    await updateCrewInFirestore(crewId, {
+      vesselExperience: [],
+      vesselName: "",
+      vesselType: "",
+      principal: "",
+      status: "approved",
+    });
 
-  await updateCrewDatabaseInFirestore(crewId, {
-    vesselExperience: [],
-    vesselName: "",
-    vesselType: "",
-    principal: "",
-    status: "approved",
-  });
+    await updateCrewDatabaseInFirestore(crewId, {
+      vesselExperience: [],
+      vesselName: "",
+      vesselType: "",
+      principal: "",
+      status: "approved",
+    });
 
-  alert("Crew has been unassigned.");
-};
+    alert("Crew has been unassigned.");
+  };
 
-
-  // EDIT ASSIGNMENT
+  // ===== EDIT ASSIGNMENT =====
   const handleEditAssignment = async (assignment: VesselAssignment) => {
     setEditAssignment(assignment);
     setShowModal(true);
@@ -415,7 +423,15 @@ const handleUnassign = async (assignmentId: string, crewId: string) => {
 
                         <p className="text-gray-700">
                           <span className="font-semibold">Status:</span>{" "}
-                          {crew?.status || "—"}
+                          {crew?.status === "assigned" ? (
+                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                              Active
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
+                              {getStatusLabel(crew?.status)}
+                            </span>
+                          )}
                         </p>
 
                         <p className="text-gray-700">
@@ -447,7 +463,6 @@ const handleUnassign = async (assignmentId: string, crewId: string) => {
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
-
                         </div>
                       </div>
                     );
