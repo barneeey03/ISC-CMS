@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { SuperAdminSidebar } from "@/app/components/SuperAdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 import { CrewApplicationForm } from "@/app/components/CrewApplicationForm";
@@ -23,7 +23,7 @@ import {
 } from "@/app/lib/crewservice";
 
 import { onSnapshot, collection } from "firebase/firestore";
-import { db } from "@/app/lib/firebase"; // <-- ensure this path is correct
+import { db } from "@/app/lib/firebase";
 
 export default function SuperAdminCrewApplications() {
   const [crews, setCrews] = useState<CrewMember[]>([]);
@@ -41,7 +41,6 @@ export default function SuperAdminCrewApplications() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
-  // REAL-TIME FIRESTORE LISTENER
   useEffect(() => {
     const crewRef = collection(db, "crewApplications");
 
@@ -118,6 +117,7 @@ export default function SuperAdminCrewApplications() {
   const approvedCrews = crews.filter((c) => c.status === "approved");
   const disapprovedCrews = crews.filter((c) => c.status === "disapproved");
   const fooledCrews = crews.filter((c) => c.status === "fooled");
+  const proposedCrews = crews.filter((c) => c.status === "proposed");
 
   const filteredCrews = useMemo(() => {
     let list = crews.filter((crew) => {
@@ -186,7 +186,7 @@ export default function SuperAdminCrewApplications() {
           <div className="pt-24 px-6 pb-10">
 
             {/* ===== STATS CARDS ===== */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
               <button
                 className="bg-white rounded-xl p-4 border border-gray-200 hover:bg-gray-50"
                 onClick={() => setStatusFilter("all")}
@@ -204,6 +204,16 @@ export default function SuperAdminCrewApplications() {
                 <p className="text-sm text-gray-500">Pending</p>
                 <p className="text-2xl font-bold text-blue-600">
                   {pendingCrews.length}
+                </p>
+              </button>
+
+              <button
+                className="bg-white rounded-xl p-4 border border-gray-200 hover:bg-gray-50"
+                onClick={() => setStatusFilter("proposed")}
+              >
+                <p className="text-sm text-gray-500">Proposed</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {proposedCrews.length}
                 </p>
               </button>
 
@@ -232,7 +242,7 @@ export default function SuperAdminCrewApplications() {
                 onClick={() => setStatusFilter("fooled")}
               >
                 <p className="text-sm text-gray-500">Fooled</p>
-                <p className="text-2xl font-bold text-yellow-600">
+                <p className="text-2xl font-bold text-purple-600">
                   {fooledCrews.length}
                 </p>
               </button>
@@ -278,7 +288,7 @@ export default function SuperAdminCrewApplications() {
             </div>
 
             {/* ===== TABLE ===== */}
-            <div className="overflow-x-auto bg-white rounded-xl shadow border">
+            <div className="overflow-x-auto overflow-y-auto max-h-130 bg-white rounded-xl shadow border">
               <table className="min-w-full divide-y">
                 <thead className="bg-blue-200">
                   <tr>
@@ -336,9 +346,9 @@ export default function SuperAdminCrewApplications() {
                               : crew.status === "proposed"
                               ? "bg-yellow-100 text-yellow-700"
                               : crew.status === "pending"
-                              ? "bg-orange-600 text-gray-900"
-                              : crew.status === "fooled"
                               ? "bg-orange-100 text-orange-700"
+                              : crew.status === "fooled"
+                              ? "bg-purple-100 text-purple-700"
                               : "bg-red-100 text-red-700"}`}
                         >
                           {crew.status.toUpperCase()}

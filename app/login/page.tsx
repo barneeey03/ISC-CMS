@@ -12,7 +12,7 @@ const ADMIN_USERS: Record<string, string> = {
 
 const SUPER_ADMIN_USERS: Record<string, string> = {
   "melba123@interworld.com": "superadmin123",
-  "herms123@superadmin.com": "superadmin123",
+  "herms123@interworld.com": "superadmin123",
   "adrianne123@interworld.com": "superadmin123",
 };
 
