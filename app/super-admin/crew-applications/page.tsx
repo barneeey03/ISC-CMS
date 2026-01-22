@@ -7,13 +7,7 @@ import { CrewApplicationForm } from "@/app/components/CrewApplicationForm";
 import { CrewDetailsModal } from "@/app/components/CrewDetailsModal";
 import { CrewMember } from "@/app/lib/dataStore";
 
-import {
-  Eye,
-  Edit2,
-  Trash2,
-  Download,
-  Search,
-} from "lucide-react";
+import { Eye, Edit2, Trash2, Download, Search } from "lucide-react";
 import jsPDF from "jspdf";
 
 import {
@@ -126,14 +120,13 @@ export default function SuperAdminCrewApplications() {
     return Math.abs(ageDate.getUTCFullYear() - 1970);
   };
 
-  // 🔥 FIXED: expiryDate now uses signedOff
   const getVesselInfo = (crew: CrewMember) => {
     const lastVessel = crew.vesselExperience?.[0];
 
     return {
       vesselName: lastVessel?.vesselName || "—",
       principal: lastVessel?.principal || "—",
-      signedOff: lastVessel?.signedOn || "—",  // <--- CHANGE THIS
+      signedOff: lastVessel?.signedOn || "—",
     };
   };
 
@@ -248,135 +241,140 @@ export default function SuperAdminCrewApplications() {
             </div>
 
             {/* TABLE */}
-            <div className="overflow-x-auto bg-white rounded-xl shadow border">
-              <table className="min-w-full divide-y">
-                <thead className="bg-blue-200">
-                  <tr>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Rank
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Name
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Vessel Type
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Vessel Name
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Principal
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Signed Off
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Age
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Email
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Remarks
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
+            <div className="bg-white rounded-xl shadow border overflow-hidden">
+              {/* IMPORTANT: Set height and allow vertical scroll */}
+              <div className="max-h-130 overflow-y-auto overflow-x-hidden">
+                <table className="min-w-full table-fixed">
+                  <thead className="bg-blue-200">
+                    <tr>
+                      <th className="w-[8%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
+                        Rank
+                      </th>
+                      <th className="w-[12%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
+                        Name
+                      </th>
+                      <th className="w-[10%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
+                        Vessel Type
+                      </th>
+                      <th className="w-[12%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
+                        Vessel Name
+                      </th>
+                      <th className="w-[12%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
+                        Principal
+                      </th>
+                      <th className="w-[10%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
+                        Signed Off
+                      </th>
+                      <th className="w-[6%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
+                        Age
+                      </th>
+                      <th className="w-[14%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
+                        Email
+                      </th>
+                      <th className="w-[8%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
+                        Status
+                      </th>
+                      <th className="w-[14%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
+                        Remarks
+                      </th>
+                      <th className="w-[10%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
+                        Action
+                      </th>
+                    </tr>
+                  </thead>
 
-                <tbody className="divide-y bg-white">
-                  {paginatedCrews.map((crew) => {
-                    const vesselInfo = getVesselInfo(crew);
+                  <tbody className="divide-y bg-white">
+                    {paginatedCrews.map((crew) => {
+                      const vesselInfo = getVesselInfo(crew);
 
-                    return (
-                      <tr key={crew.id} className="hover:bg-blue-50">
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {crew.presentRank}
-                        </td>
-                        <td className="px-6 py-4 text-center font-medium text-gray-800">
-                          {crew.fullName}
-                        </td>
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {crew.vesselType}
-                        </td>
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {vesselInfo.vesselName}
-                        </td>
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {vesselInfo.principal}
-                        </td>
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {vesselInfo.signedOff}
-                        </td>
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {getAge(crew.dateOfBirth)}
-                        </td>
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {crew.emailAddress}
-                        </td>
+                      return (
+                        <tr key={crew.id} className="hover:bg-blue-50">
+                          <td className="px-4 py-3 text-center text-gray-600">
+                            {crew.presentRank}
+                          </td>
+                          <td className="px-4 py-3 text-center font-medium text-gray-800">
+                            {crew.fullName}
+                          </td>
+                          <td className="px-4 py-3 text-center text-gray-600">
+                            {crew.vesselType}
+                          </td>
+                          <td className="px-4 py-3 text-center text-gray-600 truncate">
+                            {vesselInfo.vesselName}
+                          </td>
+                          <td className="px-4 py-3 text-center text-gray-600 truncate">
+                            {vesselInfo.principal}
+                          </td>
+                          <td className="px-4 py-3 text-center text-gray-600">
+                            {vesselInfo.signedOff}
+                          </td>
+                          <td className="px-4 py-3 text-center text-gray-600">
+                            {getAge(crew.dateOfBirth)}
+                          </td>
+                          <td className="px-4 py-3 text-center text-gray-600 truncate">
+                            {crew.emailAddress}
+                          </td>
 
-                        <td className="px-6 py-4 text-center">
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs font-semibold
-                              ${crew.status === "approved"
-                                ? "bg-green-100 text-green-700"
-                                : crew.status === "proposed"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : crew.status === "pending"
-                                ? "bg-orange-400 text-gray-900"
-                                : crew.status === "fooled"
-                                ? "bg-orange-100 text-orange-700"
-                                : crew.status === "assigned"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-red-100 text-red-700"}`}
-                          >
-                            {crew.status === "assigned" ? "ACTIVE" : crew.status.toUpperCase()}
-                          </span>
-                        </td>
-
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {crew.remarks || "No remarks"}
-                        </td>
-
-                        <td className="px-6 py-4">
-                          <div className="flex gap-2 justify-center">
-                            <button
-                              onClick={() => setSelectedCrew(crew)}
-                              className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
-                              title="View Details"
+                          <td className="px-4 py-3 text-center">
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-semibold
+                                ${crew.status === "approved"
+                                  ? "bg-green-100 text-green-700"
+                                  : crew.status === "proposed"
+                                  ? "bg-yellow-100 text-yellow-700"
+                                  : crew.status === "pending"
+                                  ? "bg-orange-400 text-gray-900"
+                                  : crew.status === "fooled"
+                                  ? "bg-orange-100 text-orange-700"
+                                  : crew.status === "assigned"
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-700"}`}
                             >
-                              <Eye className="w-4 h-4" />
-                            </button>
+                              {crew.status === "assigned"
+                                ? "ACTIVE"
+                                : crew.status.toUpperCase()}
+                            </span>
+                          </td>
 
-                            <button
-                              onClick={() => handleEdit(crew)}
-                              className="p-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition"
-                              title="Edit"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
+                          <td className="px-4 py-3 text-center text-gray-600 truncate">
+                            {crew.remarks || "No remarks"}
+                          </td>
 
-                            <button
-                              onClick={() => {
-                                setDeleteTargetId(crew.id);
-                                setShowDeleteConfirm(true);
-                              }}
-                              className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-2 justify-center">
+                              <button
+                                onClick={() => setSelectedCrew(crew)}
+                                className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
+                                title="View Details"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+
+                              <button
+                                onClick={() => handleEdit(crew)}
+                                className="p-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition"
+                                title="Edit"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setDeleteTargetId(crew.id);
+                                  setShowDeleteConfirm(true);
+                                }}
+                                className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* PAGINATION */}

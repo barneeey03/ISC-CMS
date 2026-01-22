@@ -46,7 +46,6 @@ const STATUS_STYLE: Record<string, { color: string; bg: string }> = {
 const getStatusStyle = (status: string) =>
   STATUS_STYLE[status] ?? { color: "#64748B", bg: "#CBD5E122" };
 
-// Generate unique id (no duplicates)
 const createUID = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
@@ -77,7 +76,6 @@ export default function SuperAdminDashboard() {
         return old && old.status !== x.status;
       });
 
-      // Add ALL new items as notifications
       if (newItems.length > 0) {
         const newNotifs = newItems.map((item) => ({
           uid: createUID(),
@@ -90,7 +88,6 @@ export default function SuperAdminDashboard() {
         setNotifications((prev) => [...newNotifs, ...prev]);
       }
 
-      // Add ALL status changes as notifications
       if (statusChanged.length > 0) {
         const statusNotifs = statusChanged.map((item) => ({
           uid: createUID(),
@@ -188,7 +185,7 @@ export default function SuperAdminDashboard() {
   );
 
   const total = filteredCrews.length;
-  const pending = filteredCrews.filter((c) => c.status === "pending").length;
+  const active = filteredCrews.filter((c) => c.status === "pending").length;
   const approved = filteredCrews.filter((c) => c.status === "approved").length;
   const disapproved = filteredCrews.filter((c) => c.status === "disapproved").length;
   const fooled = filteredCrews.filter((c) => c.status === "fooled").length;
@@ -320,7 +317,7 @@ export default function SuperAdminDashboard() {
               className="h-10 px-3 rounded border bg-white text-sm shadow-sm"
             >
               <option value="all">All Status</option>
-              <option value="pending">Pending</option>
+              <option value="pending">Active</option>
               <option value="approved">Approved</option>
               <option value="disapproved">Disapproved</option>
               <option value="fooled">Fooled</option>
@@ -351,7 +348,7 @@ export default function SuperAdminDashboard() {
 
               <button
                 onClick={exportPDF}
-                className="ml-3 h-10 flex items-center gap-2 px-4 rounded border bg-linear-to-r from-blue-600 to-purple-600 text-white text-sm hover:from-blue-700 hover:to-purple-700 transition"
+                className="ml-3 h-10 flex items-center gap-2 px-4 rounded border bg-linear-to-r from-red-600 to-red-600 text-white text-sm hover:from-red-700 hover:to-red-700 transition"
               >
                 <Download className="w-4 h-4" /> Export PDF
               </button>
@@ -361,7 +358,7 @@ export default function SuperAdminDashboard() {
           {/* STAT CARDS */}
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             <StatCard title="Total Crew" value={total} icon={<Users />} />
-            <StatCard title="Pending" value={pending} icon={<TrendingUp />} />
+            <StatCard title="Active" value={active} icon={<TrendingUp />} />
             <StatCard title="Approved" value={approved} icon={<FileCheck />} />
             <StatCard title="Disapproved" value={disapproved} icon={<XCircle />} />
             <StatCard title="Fooled" value={fooled} icon={<XCircle />} />
@@ -391,7 +388,7 @@ export default function SuperAdminDashboard() {
                   <Pie
                     data={[
                       { name: "Approved", value: approved },
-                      { name: "Pending", value: pending },
+                      { name: "Active", value: active },
                       { name: "Disapproved", value: disapproved },
                       { name: "Fooled", value: fooled },
                       { name: "Proposed", value: proposed }

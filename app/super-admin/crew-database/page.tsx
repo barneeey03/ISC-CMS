@@ -20,7 +20,7 @@ export default function CrewDatabase() {
   const [filterRank, setFilterRank] = useState("");
   const [filterVessel, setFilterVessel] = useState("");
   const [filterStatus, setFilterStatus] = useState<
-    "all" | "approved" | "pending" | "disapproved" | "proposed" | "fooled"
+    "all" | "approved" | "pending" | "disapproved" | "proposed" | "fooled" | "active"
   >("all");
 
   const [sortKey, setSortKey] = useState<keyof CrewType>("fullName");
@@ -56,15 +56,17 @@ export default function CrewDatabase() {
           .toLowerCase()
           .includes(filterVessel.toLowerCase());
 
+      const status = crew.status === "assigned" ? "active" : crew.status;
+
       const matchesStatus =
-        filterStatus === "all" ? true : crew.status === filterStatus;
+        filterStatus === "all" ? true : status === filterStatus;
 
       return matchesSearch && matchesName && matchesRank && matchesVessel && matchesStatus;
     });
 
     const sorted = filtered.sort((a, b) => {
-      const A = a[sortKey] ?? "";
-      const B = b[sortKey] ?? "";
+      const A = (a[sortKey] ?? "").toString();
+      const B = (b[sortKey] ?? "").toString();
 
       if (A < B) return sortDir === "asc" ? -1 : 1;
       if (A > B) return sortDir === "asc" ? 1 : -1;
@@ -108,14 +110,17 @@ export default function CrewDatabase() {
 
   // Export to Excel
   const exportExcel = () => {
-    const data = filteredCrews.map((c) => ({
-      Name: c.fullName,
-      Rank: c.presentRank,
-      Vessel: c.vesselType || "N/A",
-      Age: c.age || "—",
-      Email: c.emailAddress,
-      Status: c.status.toUpperCase(),
-    }));
+    const data = filteredCrews.map((c) => {
+      const status = c.status === "assigned" ? "active" : c.status;
+      return {
+        Name: c.fullName,
+        Rank: c.presentRank,
+        Vessel: c.vesselType || "N/A",
+        Age: c.age || "—",
+        Email: c.emailAddress,
+        Status: status.toUpperCase(),
+      };
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
@@ -136,32 +141,34 @@ export default function CrewDatabase() {
 
   // Export to PDF
   const exportPDF = () => {
-  const doc = new jsPDF();
-  doc.setFontSize(18);
-  doc.text("Crew Database", 14, 22);
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("Crew Database", 14, 22);
 
-  const headers = [["Name", "Rank", "Vessel", "Age", "Email", "Status"]];
+    const headers = [["Name", "Rank", "Vessel", "Age", "Email", "Status"]];
 
-  const rows = filteredCrews.map((c) => [
-    c.fullName,
-    c.presentRank,
-    c.vesselType || "N/A",
-    c.age || "—",
-    c.emailAddress,
-    c.status.toUpperCase(),
-  ]);
+    const rows = filteredCrews.map((c) => {
+      const status = c.status === "assigned" ? "active" : c.status;
+      return [
+        c.fullName,
+        c.presentRank,
+        c.vesselType || "N/A",
+        c.age || "—",
+        c.emailAddress,
+        status.toUpperCase(),
+      ];
+    });
 
-  (doc as any).autoTable({
-    head: headers,
-    body: rows,
-    startY: 30,
-    theme: "grid",
-    headStyles: { fillColor: [10, 165, 233] },
-  });
+    (doc as any).autoTable({
+      head: headers,
+      body: rows,
+      startY: 30,
+      theme: "grid",
+      headStyles: { fillColor: [10, 165, 233] },
+    });
 
-  doc.save("crew_database.pdf");
-};
-
+    doc.save("crew_database.pdf");
+  };
 
   return (
     <ProtectedRoute requiredRole="super-admin">
@@ -169,37 +176,36 @@ export default function CrewDatabase() {
         <SuperAdminSidebar />
 
         <div className="flex-1 ml-64">
-       {/* Header */}
-        <div className="bg-white border-b border-[#E0E8F0] p-6">
-          <div>
-            <h1 className="text-2xl font-extrabold text-[#002060]">
-              Crew Database
-            </h1>
-            <p className="text-sm text-[#80A0C0] mt-1">
-              Professional compact view with filters & infinite scroll
-            </p>
+          {/* Header */}
+          <div className="bg-white border-b border-[#E0E8F0] p-6">
+            <div>
+              <h1 className="text-2xl font-extrabold text-[#002060]">
+                Crew Database
+              </h1>
+              <p className="text-sm text-[#80A0C0] mt-1">
+                Professional compact view with filters & infinite scroll
+              </p>
+            </div>
           </div>
-        </div>
 
-        {/* Export Buttons (Outside header, right aligned) */}
-        <div className="flex justify-end mt-4 px-6">
-          <button
-            onClick={exportPDF}
-            className="flex items-center gap-2 px-5 py-2 rounded-lg bg-[#00ba03] text-white text-sm hover:bg-[#00e00b] transition"
-          >
-            <FileText className="w-4 h-4" />
-            Export PDF
-          </button>
+          {/* Export Buttons */}
+          <div className="flex justify-end mt-4 px-6 gap-3">
+            <button
+              onClick={exportPDF}
+              className="flex items-center gap-2 px-5 py-2 rounded-lg bg-[#d50000] text-white text-sm hover:bg-[#f83030] transition"
+            >
+              <FileText className="w-4 h-4" />
+              Export PDF
+            </button>
 
-          <button
-            onClick={exportExcel}
-            className="flex items-center gap-2 px-5 py-2 rounded-lg bg-[#0EA5E9] text-white text-sm hover:bg-[#0284C7] transition"
-          >
-            <Download className="w-4 h-4" />
-            Export Excel
-          </button>
-        </div>
-        
+            <button
+              onClick={exportExcel}
+              className="flex items-center gap-2 px-5 py-2 rounded-lg bg-[#00a033] text-white text-sm hover:bg-[#03cc00] transition"
+            >
+              <Download className="w-4 h-4" />
+              Export Excel
+            </button>
+          </div>
 
           {/* Filters */}
           <div className="p-6">
@@ -247,10 +253,11 @@ export default function CrewDatabase() {
                   <option value="proposed">Proposed</option>
                   <option value="disapproved">Disapproved</option>
                   <option value="fooled">Fooled</option>
+                  <option value="active">Active</option>
                 </select>
               </div>
-
             </div>
+
             {/* Table */}
             <div className="bg-white rounded-lg shadow-sm overflow-hidden mt-5">
               <table className="min-w-full text-sm">
@@ -293,46 +300,52 @@ export default function CrewDatabase() {
                 </thead>
 
                 <tbody>
-                  {visibleCrews.map((crew) => (
-                    <tr
-                      key={crew.id}
-                      className="border-b hover:bg-[#F3F6F9] cursor-pointer"
-                      onClick={() => setSelectedCrew(crew)}
-                    >
-                      <td className="px-4 py-3 text-[#002060]">
-                        {crew.fullName}
-                      </td>
-                      <td className="px-4 py-3 text-[#002060]">
-                        {crew.presentRank}
-                      </td>
-                      <td className="px-4 py-3 text-[#002060]">
-                        {crew.vesselType || "N/A"}
-                      </td>
-                      <td className="px-4 py-3 text-[#002060]">
-                        {crew.age || "—"}
-                      </td>
-                      <td className="px-4 py-3 text-[#002060]">
-                        {crew.emailAddress}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-bold ${
-                            crew.status === "approved"
-                              ? "bg-[#22C55E] text-white"
-                              : crew.status === "pending"
-                                ? "bg-[#F59E0B] text-white"
-                                : crew.status === "proposed"
-                                  ? "bg-[#8B5CF6] text-white"
-                                  : crew.status === "fooled"
-                                    ? "bg-[#0EA5E9] text-white"
-                                    : "bg-[#EF4444] text-white"
-                          }`}
-                        >
-                          {crew.status.toUpperCase()}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {visibleCrews.map((crew) => {
+                    const status = crew.status === "assigned" ? "active" : crew.status;
+
+                    return (
+                      <tr
+                        key={crew.id}
+                        className="border-b hover:bg-[#F3F6F9] cursor-pointer"
+                        onClick={() => setSelectedCrew(crew)}
+                      >
+                        <td className="px-4 py-3 text-[#002060]">
+                          {crew.fullName}
+                        </td>
+                        <td className="px-4 py-3 text-[#002060]">
+                          {crew.presentRank}
+                        </td>
+                        <td className="px-4 py-3 text-[#002060]">
+                          {crew.vesselType || "N/A"}
+                        </td>
+                        <td className="px-4 py-3 text-[#002060]">
+                          {crew.age || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-[#002060]">
+                          {crew.emailAddress}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-bold ${
+                              status === "approved"
+                                ? "bg-[#22C55E] text-white"
+                                : status === "pending"
+                                  ? "bg-[#F59E0B] text-white"
+                                  : status === "proposed"
+                                    ? "bg-[#8B5CF6] text-white"
+                                    : status === "active"
+                                      ? "bg-[#22C55E] text-white" // ACTIVE green
+                                      : status === "fooled"
+                                        ? "bg-[#0EA5E9] text-white"
+                                        : "bg-[#EF4444] text-white"
+                            }`}
+                          >
+                            {status.toUpperCase()}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -387,13 +400,16 @@ export default function CrewDatabase() {
                     <div>
                       <p className="text-xs text-[#80A0C0]">Status</p>
                       <p className="font-bold text-[#002060]">
-                        {selectedCrew.status.toUpperCase()}
+                        {(selectedCrew.status === "assigned"
+                          ? "ACTIVE"
+                          : selectedCrew.status.toUpperCase())}
                       </p>
                     </div>
                   </div>
                 </div>
               </div>
             )}
+
           </div>
         </div>
       </div>

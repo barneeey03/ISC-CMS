@@ -54,7 +54,6 @@ export default function CrewApplications() {
   useEffect(() => {
     setPage(1);
   }, [searchQuery, statusFilter]);
-  
 
   const handleApprove = async (id: string) => {
     await updateCrewInFirestore(id, { status: "approved" });
@@ -112,7 +111,7 @@ export default function CrewApplications() {
     return {
       vesselName: lastVessel?.vesselName || "—",
       principal: lastVessel?.principal || "—",
-      signedOff: lastVessel?.signedOn || "—",  // <--- CHANGE THIS
+      signedOff: lastVessel?.signedOn || "—",
     };
   };
 
@@ -240,138 +239,148 @@ export default function CrewApplications() {
             </div>
 
             {/* TABLE */}
-            <div className="overflow-x-auto bg-white rounded-xl shadow border">
-              <table className="min-w-full divide-y">
-                <thead className="bg-blue-200">
-                  <tr>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Rank
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Name
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Vessel Type
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Vessel Name
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Principal
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Expiry Date
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Age
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Email
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Remarks
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
+            <div className="bg-white rounded-xl shadow border overflow-hidden">
+              <div className="max-h-130 overflow-y-auto overflow-x-hidden">
+                <table className="w-full">
+                  <thead className="bg-blue-200 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-center text-xs font-semibold text-gray-800">
+                        Rank
+                      </th>
+                      <th className="px-3 py-2 text-center text-xs font-semibold text-gray-800">
+                        Name
+                      </th>
+                      <th className="px-3 py-2 text-center text-xs font-semibold text-gray-800">
+                        Vessel Type
+                      </th>
 
-                <tbody className="divide-y bg-white">
-                  {paginatedCrews.map((crew) => {
-                    const vesselInfo = getVesselInfo(crew); // <-- NEW
+                      {/* Hidden on mobile */}
+                      <th className="hidden md:table-cell px-3 py-2 text-center text-xs font-semibold text-gray-800">
+                        Vessel Name
+                      </th>
+                      <th className="hidden md:table-cell px-3 py-2 text-center text-xs font-semibold text-gray-800">
+                        Principal
+                      </th>
+                      <th className="hidden md:table-cell px-3 py-2 text-center text-xs font-semibold text-gray-800">
+                        Signed Off
+                      </th>
 
-                    return (
-                      <tr key={crew.id} className="hover:bg-blue-50">
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {crew.presentRank}
-                        </td>
-                        <td className="px-6 py-4 text-center font-medium text-gray-800">
-                          {crew.fullName}
-                        </td>
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {crew.vesselType}
-                        </td>
+                      <th className="px-3 py-2 text-center text-xs font-semibold text-gray-800">
+                        Age
+                      </th>
 
-                        {/* NEW TABLE DATA */}
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {vesselInfo.vesselName}
-                        </td>
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {vesselInfo.principal}
-                        </td>
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {vesselInfo.signedOff}
-                        </td>
+                      {/* Hidden on mobile */}
+                      <th className="hidden md:table-cell px-3 py-2 text-center text-xs font-semibold text-gray-800">
+                        Email
+                      </th>
 
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {getAge(crew.dateOfBirth)}
-                        </td>
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {crew.emailAddress}
-                        </td>
+                      <th className="px-3 py-2 text-center text-xs font-semibold text-gray-800">
+                        Status
+                      </th>
+                      <th className="hidden lg:table-cell px-3 py-2 text-center text-xs font-semibold text-gray-800">
+                        Remarks
+                      </th>
+                      <th className="px-3 py-2 text-center text-xs font-semibold text-gray-800">
+                        Action
+                      </th>
+                    </tr>
+                  </thead>
 
-                        <td className="px-6 py-4 text-center">
-                          <span
-                           className={`px-3 py-1 rounded-full text-xs font-semibold
-                          ${crew.status === "approved"
-                            ? "bg-green-100 text-green-700"
-                            : crew.status === "proposed"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : crew.status === "pending"
-                            ? "bg-orange-400 text-gray-900"
-                            : crew.status === "fooled"
-                            ? "bg-orange-100 text-orange-700"
-                            : crew.status === "assigned"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"}`}
-                          >
-                            {crew.status === "assigned" ? "ACTIVE" : crew.status.toUpperCase()}
-                          </span>
-                        </td>
+                  <tbody>
+                    {paginatedCrews.map((crew) => {
+                      const vesselInfo = getVesselInfo(crew);
 
-                        <td className="px-6 py-4 text-center text-gray-600">
-                          {crew.remarks || "No remarks"}
-                        </td>
+                      return (
+                        <tr key={crew.id} className="hover:bg-blue-50">
+                          <td className="px-3 py-2 text-center text-gray-600">
+                            {crew.presentRank}
+                          </td>
+                          <td className="px-3 py-2 text-center font-medium text-gray-800">
+                            {crew.fullName}
+                          </td>
+                          <td className="px-3 py-2 text-center text-gray-600">
+                            {crew.vesselType}
+                          </td>
 
-                        <td className="px-6 py-4">
-                          <div className="flex gap-2 justify-center">
-                            <button
-                              onClick={() => setSelectedCrew(crew)}
-                              className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
-                              title="View Details"
+                          <td className="hidden md:table-cell px-3 py-2 text-center text-gray-600">
+                            {vesselInfo.vesselName}
+                          </td>
+                          <td className="hidden md:table-cell px-3 py-2 text-center text-gray-600">
+                            {vesselInfo.principal}
+                          </td>
+                          <td className="hidden md:table-cell px-3 py-2 text-center text-gray-600">
+                            {vesselInfo.signedOff}
+                          </td>
+
+                          <td className="px-3 py-2 text-center text-gray-600">
+                            {getAge(crew.dateOfBirth)}
+                          </td>
+
+                          <td className="hidden md:table-cell px-3 py-2 text-center text-gray-600">
+                            {crew.emailAddress}
+                          </td>
+
+                          <td className="px-3 py-2 text-center">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-semibold
+                              ${crew.status === "approved"
+                                ? "bg-green-100 text-green-700"
+                                : crew.status === "proposed"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : crew.status === "pending"
+                                ? "bg-orange-400 text-gray-900"
+                                : crew.status === "fooled"
+                                ? "bg-orange-100 text-orange-700"
+                                : crew.status === "assigned"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"}`}
                             >
-                              <Eye className="w-4 h-4" />
-                            </button>
+                              {crew.status === "assigned"
+                                ? "ACTIVE"
+                                : crew.status.toUpperCase()}
+                            </span>
+                          </td>
 
-                            <button
-                              onClick={() => handleEdit(crew)}
-                              className="p-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition"
-                              title="Edit"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
+                          <td className="hidden lg:table-cell px-3 py-2 text-center text-gray-600">
+                            {crew.remarks || "No remarks"}
+                          </td>
 
-                            <button
-                              onClick={() => {
-                                setDeleteTargetId(crew.id);
-                                setShowDeleteConfirm(true);
-                              }}
-                              className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          <td className="px-3 py-2">
+                            <div className="flex gap-2 justify-center">
+                              <button
+                                onClick={() => setSelectedCrew(crew)}
+                                className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
+                                title="View Details"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+
+                              <button
+                                onClick={() => handleEdit(crew)}
+                                className="p-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition"
+                                title="Edit"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setDeleteTargetId(crew.id);
+                                  setShowDeleteConfirm(true);
+                                }}
+                                className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* PAGINATION */}

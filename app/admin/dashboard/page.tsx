@@ -12,7 +12,6 @@ import {
   Activity,
   Download,
   Search,
-  ArrowUpDown,
 } from "lucide-react";
 
 import {
@@ -35,7 +34,7 @@ import { listenCrewApplications } from "@/app/lib/crewservice";
 /* =======================
    TYPES
 ======================= */
-type CrewStatus = "all" | "approved" | "pending" | "disapproved" | "fooled";
+type CrewStatus = "all" | "approved" | "proposed" | "disapproved" | "fooled" | "assigned";
 
 /* =======================
    CONSTANTS
@@ -48,22 +47,24 @@ const THEME_COLORS = {
   red: "#EF4444",
   blue: "#3B82F6",
   purple: "#8B5CF6",
+  teal: "#14B8A6",
 };
 
 const COLORS = [
   THEME_COLORS.blue,
   THEME_COLORS.amber,
+  THEME_COLORS.green,
   THEME_COLORS.red,
   THEME_COLORS.purple,
 ];
 
 /* =======================
-   DATE HELPERS (FIX)
+   DATE HELPERS
 ======================= */
 const getTime = (value: any): number => {
   if (!value) return 0;
-  if (value?.toDate) return value.toDate().getTime(); // Firestore Timestamp
-  if (value?.seconds) return value.seconds * 1000;   // Raw timestamp
+  if (value?.toDate) return value.toDate().getTime();
+  if (value?.seconds) return value.seconds * 1000;
   const d = new Date(value);
   return isNaN(d.getTime()) ? 0 : d.getTime();
 };
@@ -106,13 +107,7 @@ export default function AdminDashboard() {
 
     // Status
     if (statusFilter !== "all") {
-      if (statusFilter === "pending") {
-        list = list.filter(
-          (c) => c.status === "pending" || c.status === "proposed"
-        );
-      } else {
-        list = list.filter((c) => c.status === statusFilter);
-      }
+      list = list.filter((c) => c.status === statusFilter);
     }
 
     // Date range
@@ -145,33 +140,30 @@ export default function AdminDashboard() {
   }, [crews, statusFilter, startDate, endDate, searchQuery, sortBy, sortDir]);
 
   /* =======================
-   PAGINATION (FIXED)
+   PAGINATION
 ======================= */
-const totalPages = Math.max(1, Math.ceil(filteredCrews.length / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(filteredCrews.length / ITEMS_PER_PAGE));
 
-// Reset page when filters change
-useEffect(() => {
-  setCurrentPage(1);
-}, [statusFilter, startDate, endDate, searchQuery]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, startDate, endDate, searchQuery]);
 
-const paginatedCrews = filteredCrews.slice(
-  (currentPage - 1) * ITEMS_PER_PAGE,
-  currentPage * ITEMS_PER_PAGE
-);
-
+  const paginatedCrews = filteredCrews.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   /* =======================
      COUNTS
   ======================= */
   const approvedCount = filteredCrews.filter((c) => c.status === "approved").length;
-  const pendingCount = filteredCrews.filter(
-    (c) => c.status === "pending" || c.status === "proposed"
-  ).length;
+  const proposedCount = filteredCrews.filter((c) => c.status === "proposed").length;
   const disapprovedCount = filteredCrews.filter((c) => c.status === "disapproved").length;
   const fooledCount = filteredCrews.filter((c) => c.status === "fooled").length;
+  const assignedCount = filteredCrews.filter((c) => c.status === "assigned").length;
 
   /* =======================
-     CHART DATA
+     CHART DATA (REAL-TIME)
   ======================= */
   const trendData = filteredCrews
     .map((c) => ({ date: formatDate(c.createdAt) }))
@@ -185,7 +177,8 @@ const paginatedCrews = filteredCrews.slice(
 
   const pieData = [
     { name: "Approved", value: approvedCount },
-    { name: "Pending", value: pendingCount },
+    { name: "Proposed", value: proposedCount },
+    { name: "Active", value: assignedCount },
     { name: "Disapproved", value: disapprovedCount },
     { name: "Fooled", value: fooledCount },
   ];
@@ -211,9 +204,6 @@ const paginatedCrews = filteredCrews.slice(
     doc.save("crew_report.pdf");
   };
 
-  /* =======================
-     RENDER
-  ======================= */
   return (
     <ProtectedRoute requiredRole="admin">
       <div className="flex">
@@ -238,13 +228,14 @@ const paginatedCrews = filteredCrews.slice(
               <h2 className="font-bold mb-4">Filters</h2>
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <select
-                  className="border rounded-xl p-3"
+                  className="border rounded-xl p-3 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value as CrewStatus)}
                 >
                   <option value="all">All</option>
                   <option value="approved">Approved</option>
-                  <option value="pending">Pending</option>
+                  <option value="proposed">Proposed</option>
+                  <option value="assigned">Active</option>
                   <option value="disapproved">Disapproved</option>
                   <option value="fooled">Fooled</option>
                 </select>
@@ -272,27 +263,38 @@ const paginatedCrews = filteredCrews.slice(
             </div>
 
             {/* STATS */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {[
-                { label: "Total Crew", value: filteredCrews.length, icon: Users, color: "text-blue-600" },
-                { label: "Pending", value: pendingCount, icon: TrendingUp, color: "text-amber-500" },
-                { label: "Approved", value: approvedCount, icon: FileCheck, color: "text-green-500" },
-                { label: "Disapproved", value: disapprovedCount, icon: XCircle, color: "text-red-500" },
-                { label: "Fooled", value: fooledCount, icon: Activity, color: "text-purple-500" },
-              ].map((s) => (
-                <div key={s.label} className="bg-white rounded-2xl shadow-sm p-6 border">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-sm text-gray-500 font-semibold">{s.label}</p>
-                      <p className="text-3xl font-extrabold mt-2">{s.value}</p>
+                { label: "Total Crew", value: filteredCrews.length, status: "all", icon: Users, color: "text-blue-600" },
+                { label: "Proposed", value: proposedCount, status: "proposed", icon: TrendingUp, color: "text-amber-500" },
+                { label: "Approved", value: approvedCount, status: "approved", icon: FileCheck, color: "text-green-500" },
+
+                { label: "Active", value: assignedCount, status: "assigned", icon: Activity, color: "text-green-500" },
+                { label: "Disapproved", value: disapprovedCount, status: "disapproved", icon: XCircle, color: "text-red-500" },
+                { label: "Fooled", value: fooledCount, status: "fooled", icon: Activity, color: "text-purple-500" },
+              ].map((s) => {
+                const isActive = statusFilter === s.status || (s.status === "all" && statusFilter === "all");
+                return (
+                  <button
+                    key={s.label}
+                    onClick={() => setStatusFilter(s.status as CrewStatus)}
+                    className={`bg-white rounded-2xl shadow-sm p-6 border transition hover:shadow-md ${
+                      isActive ? "ring-2 ring-blue-500" : ""
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm text-gray-500 font-semibold">{s.label}</p>
+                        <p className="text-3xl font-extrabold mt-2">{s.value}</p>
+                      </div>
+                      <s.icon className={`w-12 h-12 opacity-25 ${s.color}`} />
                     </div>
-                    <s.icon className={`w-12 h-12 opacity-25 ${s.color}`} />
-                  </div>
-                </div>
-              ))}
+                  </button>
+                );
+              })}
             </div>
 
-            {/* CHARTS (KEPT) */}
+            {/* CHARTS */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
               <div className="bg-white rounded-2xl shadow-sm p-6 border">
                 <h2 className="font-bold mb-4">Application Trend</h2>
@@ -363,24 +365,24 @@ const paginatedCrews = filteredCrews.slice(
               </table>
 
               <div className="flex justify-between mt-4">
-              <button
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="px-4 py-2 bg-gray-100 rounded-xl"
-              >
-                Previous
-              </button>
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="px-4 py-2 bg-gray-100 rounded-xl"
+                >
+                  Previous
+                </button>
 
-              <button
-                disabled={currentPage >= totalPages}
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
-                }
-                className="px-4 py-2 bg-blue-600 text-white rounded-xl"
-              >
-                Next
-              </button>
-            </div>
+                <button
+                  disabled={currentPage >= totalPages}
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
+                  className="px-4 py-2 bg-blue-600 text-white rounded-xl"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
         </div>
