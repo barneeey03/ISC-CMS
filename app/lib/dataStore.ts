@@ -110,6 +110,7 @@ export interface CrewMember {
 }
 
 class DataStore {
+  [x: string]: any;
   private crews: Map<string, CrewMember> = new Map();
   private nextId = 1;
 

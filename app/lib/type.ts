@@ -3,8 +3,9 @@ export type CrewMemberStatus =
   | "proposed"
   | "approved"
   | "disapproved"
-  | "fooled";
-
+  | "fooled"
+  | "assigned";
+  
 export type Certificate = {
   id: string;
   name: string;

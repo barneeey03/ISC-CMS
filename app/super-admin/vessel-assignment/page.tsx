@@ -1,230 +1,393 @@
 "use client";
 
-import React from "react";
-import { useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { SuperAdminSidebar } from "@/app/components/SuperAdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
-import { dataStore } from "@/app/lib/dataStore";
-import { Ship, Users, ArrowRight } from "lucide-react";
+import { CrewMember } from "@/app/lib/dataStore";
+import { Search, Ship, X } from "lucide-react";
+
+import {
+  updateCrewInFirestore,
+  updateCrewDatabaseInFirestore,
+} from "@/app/lib/crewservice";
+
+import { db } from "@/app/lib/firebase";
+import {
+  collection,
+  onSnapshot,
+  addDoc,
+  query,
+  orderBy,
+} from "firebase/firestore";
+
+type VesselAssignment = {
+  id?: string;
+  crewId: string;
+  crewName: string;
+  vesselName: string;
+  vesselType: string;
+  principal: string;
+  assignedDate: string;
+};
 
 export default function VesselAssignment() {
-  const [crews, setCrews] = useState(dataStore.getAllCrews());
-  const [selectedCrew, setSelectedCrew] = useState<string | null>(null);
-  const [vesselAssignments, setVesselAssignments] = useState<
-    { crewId: string; vesselName: string; vesselType: string; principal: string; assignedDate: string }[]
-  >([]);
-  const [formData, setFormData] = useState({
+  const [crews, setCrews] = useState<CrewMember[]>([]);
+  const [selectedCrew, setSelectedCrew] = useState<CrewMember | null>(null);
+
+  const [transferData, setTransferData] = useState({
     vesselName: "",
     vesselType: "",
     principal: "",
   });
 
-  const refreshCrews = useCallback(() => {
-    setCrews(dataStore.getAllCrews());
+  const [vesselAssignments, setVesselAssignments] = useState<VesselAssignment[]>(
+    []
+  );
+
+  const [showModal, setShowModal] = useState(false);
+
+  // SEARCH
+  const [crewSearch, setCrewSearch] = useState("");
+
+  // Fetch crews
+  useEffect(() => {
+    const crewRef = collection(db, "crewApplications");
+    const unsubscribe = onSnapshot(crewRef, (snapshot) => {
+      const list: CrewMember[] = [];
+      snapshot.forEach((doc) => {
+        list.push({
+          ...(doc.data() as any),
+          id: doc.id,
+        });
+      });
+      setCrews(list);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const approvedCrews = crews.filter((c) => c.status === "approved");
+  // Live listen to assignments collection in Firestore
+  useEffect(() => {
+    const q = query(
+      collection(db, "vesselAssignments"),
+      orderBy("assignedDate", "desc")
+    );
 
-  const handleAssignVessel = (e: React.FormEvent) => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: VesselAssignment[] = [];
+      snapshot.forEach((doc) => {
+        list.push({
+          ...(doc.data() as any),
+          id: doc.id,
+        });
+      });
+      setVesselAssignments(list);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const filteredCrews = useMemo(() => {
+    const filtered = crews.filter(
+      (c) =>
+        c.status === "approved" ||
+        c.status === "proposed" ||
+        c.status === "fooled"
+    );
+
+    if (!crewSearch.trim()) return filtered;
+
+    return filtered.filter((c) => {
+      const q = crewSearch.toLowerCase();
+      return (
+        c.fullName.toLowerCase().includes(q) ||
+        c.emailAddress.toLowerCase().includes(q) ||
+        c.mobileNumber.toLowerCase().includes(q)
+      );
+    });
+  }, [crews, crewSearch]);
+
+  // When crew selected -> autofill current data
+  const handleCrewSelect = (id: string) => {
+    const crew = crews.find((c) => c.id === id) || null;
+    setSelectedCrew(crew);
+
+    if (crew) {
+      setTransferData({
+        vesselName: crew.vesselName || "",
+        vesselType: crew.vesselType || "",
+        principal: crew.principal || "",
+      });
+    }
+  };
+
+  // Assign Vessel (Transfer)
+  const handleAssignVessel = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCrew || !formData.vesselName || !formData.vesselType || !formData.principal) {
+    if (!selectedCrew) return;
+
+    // STATUS VALIDATION
+    if (
+      !["approved", "proposed", "fooled"].includes(selectedCrew.status || "")
+    ) {
+      alert("Only approved/proposed/fooled crews can be assigned.");
       return;
     }
 
-    const assignment = {
-      crewId: selectedCrew,
-      vesselName: formData.vesselName,
-      vesselType: formData.vesselType,
-      principal: formData.principal,
-      assignedDate: new Date().toISOString().split("T")[0],
-    };
-
-    setVesselAssignments([...vesselAssignments, assignment]);
-
-    // Update crew with vessel info
-    dataStore.updateCrew(selectedCrew, {
-      vesselType: formData.vesselType,
+    // Update crew application document
+    await updateCrewInFirestore(selectedCrew.id!, {
+      vesselName: transferData.vesselName,
+      vesselType: transferData.vesselType,
+      principal: transferData.principal,
+      status: "assigned",
     });
 
-    // Reset form
-    setFormData({ vesselName: "", vesselType: "", principal: "" });
-    setSelectedCrew(null);
-    refreshCrews();
-  };
+    // Update crew database document
+    await updateCrewDatabaseInFirestore(selectedCrew.id!, {
+      vesselName: transferData.vesselName,
+      vesselType: transferData.vesselType,
+      principal: transferData.principal,
+      status: "assigned",
+    });
 
-  const getCrewName = (crewId: string) => {
-    const crew = crews.find((c) => c.id === crewId);
-    return crew?.fullName || "Unknown";
+    // Save assignment to Firestore
+    await addDoc(collection(db, "vesselAssignments"), {
+      crewId: selectedCrew.id,
+      crewName: selectedCrew.fullName,
+      vesselName: transferData.vesselName,
+      vesselType: transferData.vesselType,
+      principal: transferData.principal,
+      assignedDate: new Date().toISOString().split("T")[0],
+    });
+
+    setSelectedCrew(null);
+    setTransferData({ vesselName: "", vesselType: "", principal: "" });
+    setCrewSearch("");
+    setShowModal(false);
   };
 
   return (
     <ProtectedRoute requiredRole="super-admin">
-      <div className="flex min-h-screen bg-[#F5F9FC]">
+      <div className="flex min-h-screen bg-linear-to-b from-[#F4F9FF] to-[#FFFFFF]">
         <SuperAdminSidebar />
 
-        {/* MAIN CONTENT */}
-        {/* ADD ml-64 to avoid sidebar overlap */}
-        <div className="flex-1 min-h-screen ml-64">
-          {/* Header */}
-          <div className="bg-white border-b border-[#E0E8F0] p-6">
-            <h1 className="text-3xl font-extrabold text-[#002060]">Vessel Assignment</h1>
-            <p className="text-[#80A0C0] mt-1">Assign and manage crew vessel assignments</p>
+        <div className="flex-1 min-h-screen lg:ml-64 p-6">
+          <div className="bg-white border-b border-[#E0E8F0] p-6 rounded-lg shadow-sm">
+            <h1 className="text-3xl font-extrabold text-[#002060]">
+              Vessel Assignment
+            </h1>
+            <p className="text-[#6B7A92] mt-1">
+              Assign crew to vessel with ease
+            </p>
           </div>
 
-          {/* Content */}
-          <div className="p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Assignment Form */}
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-extrabold text-[#002060] mb-4 flex items-center gap-2">
-                  <Ship className="w-6 h-6 text-[#0080C0]" />
-                  Assign Vessel
-                </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
 
-                <form onSubmit={handleAssignVessel} className="space-y-4">
-                  {/* Crew Selection */}
-                  <div>
-                    <label className="block text-sm font-semibold text-[#002060] mb-2">
-                      Select Crew Member
-                    </label>
-                    <select
-                      value={selectedCrew || ""}
-                      onChange={(e) => setSelectedCrew(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#D0E0F0] bg-[#F9FBFD] text-[#002060] focus:outline-none focus:ring-2 focus:ring-[#60A0C0] text-sm"
-                      required
-                    >
-                      <option value="">Choose a crew member</option>
-                      {approvedCrews.map((crew) => (
-                        <option key={crew.id} value={crew.id}>
-                          {crew.fullName}
-                        </option>
-                      ))}
-                    </select>
+            {/* SELECT CREW */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-bold text-[#002060] mb-4">
+                Select Crew
+              </h2>
+
+              <div className="relative mb-4">
+                <div className="absolute left-3 top-3">
+                  <Search className="w-4 h-4 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  value={crewSearch}
+                  onChange={(e) => setCrewSearch(e.target.value)}
+                  placeholder="Search crew by name, email, or contact..."
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+
+              <select
+                className="w-full px-4 py-2 rounded-lg border"
+                onChange={(e) => handleCrewSelect(e.target.value)}
+                value={selectedCrew?.id || ""}
+              >
+                <option value="">Choose a crew member</option>
+                {filteredCrews.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.fullName} • {c.presentRank}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                className="w-full bg-[#0080C0] text-white py-2 rounded-lg mt-4 hover:bg-blue-700 transition"
+                onClick={() => setShowModal(true)}
+                disabled={!selectedCrew}
+              >
+                Assign Vessel
+              </button>
+
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold text-[#002060]">
+                  Current Assignment Details
+                </h3>
+
+                <div className="mt-2 space-y-2">
+                  <div className="text-sm text-gray-700">
+                    <span className="font-semibold">Vessel Name:</span>{" "}
+                    {selectedCrew?.vesselName || "—"}
                   </div>
-
-                  {/* Vessel Name */}
-                  <div>
-                    <label className="block text-sm font-semibold text-[#002060] mb-2">
-                      Vessel Name
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.vesselName}
-                      onChange={(e) => setFormData({ ...formData, vesselName: e.target.value })}
-                      placeholder="e.g., MV Ocean Star"
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#D0E0F0] bg-[#F9FBFD] text-[#002060] placeholder-[#80A0C0] focus:outline-none focus:ring-2 focus:ring-[#60A0C0] text-sm"
-                      required
-                    />
+                  <div className="text-sm text-gray-700">
+                    <span className="font-semibold">Vessel Type:</span>{" "}
+                    {selectedCrew?.vesselType || "—"}
                   </div>
-
-                  {/* Vessel Type */}
-                  <div>
-                    <label className="block text-sm font-semibold text-[#002060] mb-2">
-                      Vessel Type
-                    </label>
-                    <select
-                      value={formData.vesselType}
-                      onChange={(e) => setFormData({ ...formData, vesselType: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#D0E0F0] bg-[#F9FBFD] text-[#002060] focus:outline-none focus:ring-2 focus:ring-[#60A0C0] text-sm"
-                      required
-                    >
-                      <option value="">Select vessel type</option>
-                      <option value="Container Ship">Container Ship</option>
-                      <option value="Tanker">Tanker</option>
-                      <option value="Bulk Carrier">Bulk Carrier</option>
-                      <option value="General Cargo">General Cargo</option>
-                      <option value="RoRo Ship">RoRo Ship</option>
-                      <option value="Refrigerated">Refrigerated</option>
-                    </select>
+                  <div className="text-sm text-gray-700">
+                    <span className="font-semibold">Principal:</span>{" "}
+                    {selectedCrew?.principal || "—"}
                   </div>
-
-                  {/* Principal/Company */}
-                  <div>
-                    <label className="block text-sm font-semibold text-[#002060] mb-2">
-                      Principal / Shipping Company
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.principal}
-                      onChange={(e) => setFormData({ ...formData, principal: e.target.value })}
-                      placeholder="e.g., Global Shipping Ltd."
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#D0E0F0] bg-[#F9FBFD] text-[#002060] placeholder-[#80A0C0] focus:outline-none focus:ring-2 focus:ring-[#60A0C0] text-sm"
-                      required
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={!selectedCrew || !formData.vesselName || !formData.vesselType || !formData.principal}
-                    className="w-full px-4 py-2.5 bg-[#0080C0] hover:bg-[#006BA0] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors text-sm"
-                  >
-                    Assign Vessel
-                  </button>
-                </form>
-
-                <div className="mt-6 p-4 bg-[#E8F4F8] rounded-lg border border-[#B0D8E8]">
-                  <p className="text-xs font-semibold text-[#0080C0] mb-2">Available Crew</p>
-                  <p className="text-2xl font-extrabold text-[#0080C0]">{approvedCrews.length}</p>
                 </div>
               </div>
+            </div>
 
-              {/* Assignments List */}
-              <div className="lg:col-span-2 space-y-4">
-                <h2 className="text-xl font-extrabold text-[#002060] flex items-center gap-2">
-                  <ArrowRight className="w-6 h-6 text-[#0080C0]" />
-                  Current Assignments ({vesselAssignments.length})
+            {/* ASSIGNMENTS LIST */}
+            <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-[#002060]">
+                  Vessel Assignments
                 </h2>
-
-                {vesselAssignments.length === 0 ? (
-                  <div className="bg-white rounded-lg shadow-md p-12 text-center">
-                    <Users className="w-16 h-16 text-[#80A0C0] opacity-30 mx-auto mb-4" />
-                    <h3 className="text-xl font-bold text-[#002060] mb-2">No Assignments Yet</h3>
-                    <p className="text-[#80A0C0]">Create your first vessel assignment to get started.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {vesselAssignments.map((assignment, index) => (
-                      <div
-                        key={index}
-                        className="bg-white rounded-lg shadow-md p-6 border-l-4 border-[#28A745]"
-                      >
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                          <div>
-                            <p className="text-xs font-semibold text-[#80A0C0]">Crew Member</p>
-                            <p className="text-lg font-bold text-[#002060]">{getCrewName(assignment.crewId)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs font-semibold text-[#80A0C0]">Assigned Date</p>
-                            <p className="text-sm text-[#002060]">{assignment.assignedDate}</p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-3 border-b border-[#E0E8F0]">
-                          <div>
-                            <p className="text-xs font-semibold text-[#80A0C0]">Vessel Name</p>
-                            <p className="font-bold text-[#0080C0]">{assignment.vesselName}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs font-semibold text-[#80A0C0]">Vessel Type</p>
-                            <p className="text-sm text-[#002060]">{assignment.vesselType}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs font-semibold text-[#80A0C0]">Principal</p>
-                            <p className="text-sm text-[#002060]">{assignment.principal}</p>
-                          </div>
-                        </div>
-                        <div className="mt-3">
-                          <span className="px-3 py-1 bg-[#28A745] text-white text-xs font-bold rounded-full">
-                            Active
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <span className="text-sm text-gray-500">
+                  Live updates from Firestore
+                </span>
               </div>
+
+              {vesselAssignments.length === 0 ? (
+                <div className="text-center py-10 text-gray-500">
+                  No assignments yet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {vesselAssignments.map((a) => (
+                    <div
+                      key={a.id}
+                      className="border p-4 rounded-lg shadow-sm hover:shadow-md transition"
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <p className="font-bold text-[#002060]">
+                          {a.crewName}
+                        </p>
+                        <span className="text-xs text-gray-500">
+                          {a.assignedDate}
+                        </span>
+                      </div>
+                      <p className="text-gray-700">
+                        <span className="font-semibold">Vessel:</span>{" "}
+                        {a.vesselName}
+                      </p>
+                      <p className="text-gray-700">
+                        <span className="font-semibold">Type:</span>{" "}
+                        {a.vesselType}
+                      </p>
+                      <p className="text-gray-700">
+                        <span className="font-semibold">Principal:</span>{" "}
+                        {a.principal}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
+
+        {/* ===== MODAL ===== */}
+        {showModal && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 w-11/12 md:w-1/2">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Ship className="w-5 h-5 text-blue-600" />
+                  Assign Vessel
+                </h2>
+                <button
+                  className="text-gray-600 hover:text-gray-800"
+                  onClick={() => setShowModal(false)}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAssignVessel} className="space-y-4">
+                <label className="text-sm font-semibold text-[#002060]">
+                  Vessel Name
+                </label>
+                <input
+                  value={transferData.vesselName}
+                  onChange={(e) =>
+                    setTransferData({
+                      ...transferData,
+                      vesselName: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  placeholder="e.g., MV Ocean Star"
+                  required
+                />
+
+                <label className="text-sm font-semibold text-[#002060]">
+                  Vessel Type
+                </label>
+                <select
+                  value={transferData.vesselType}
+                  onChange={(e) =>
+                    setTransferData({
+                      ...transferData,
+                      vesselType: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  required
+                >
+                  <option value="">Select vessel type</option>
+                  <option value="Container Ship">Container Ship</option>
+                  <option value="Tanker">Tanker</option>
+                  <option value="Bulk Carrier">Bulk Carrier</option>
+                  <option value="General Cargo">General Cargo</option>
+                  <option value="RoRo Ship">RoRo Ship</option>
+                  <option value="Refrigerated">Refrigerated</option>
+                </select>
+
+                <label className="text-sm font-semibold text-[#002060]">
+                  Principal / Shipping Company
+                </label>
+                <input
+                  value={transferData.principal}
+                  onChange={(e) =>
+                    setTransferData({
+                      ...transferData,
+                      principal: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  placeholder="e.g., Global Shipping Ltd."
+                  required
+                />
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
+                    onClick={() => setShowModal(false)}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-lg bg-[#0080C0] text-white hover:bg-blue-700 transition"
+                  >
+                    Assign Vessel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </ProtectedRoute>
   );

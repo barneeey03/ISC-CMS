@@ -18,6 +18,7 @@ import { db } from "./firebase";
 import { CrewMember } from "./dataStore";
 
 const crewCollection = collection(db, "crewApplications");
+const crewDatabaseCollection = collection(db, "crewDatabase"); // <-- NEW
 
 // Add crew
 export async function addCrewToFirestore(
@@ -30,8 +31,18 @@ export async function addCrewToFirestore(
   return docRef.id;
 }
 
+// Add crew to crewDatabase (NEW)
+export async function addCrewToDatabaseFirestore(
+  id: string,
+  payload: Omit<CrewMember, "id" | "createdAt">
+) {
+  await setDoc(doc(db, "crewDatabase", id), {
+    ...payload,
+    createdAt: serverTimestamp(),
+  });
+}
 
-// Update crew
+// Update crew in crewApplications
 export async function updateCrewInFirestore(
   id: string,
   payload: Partial<Omit<CrewMember, "id" | "createdAt">>
@@ -46,13 +57,27 @@ export async function updateCrewInFirestore(
   await updateDoc(docRef, cleanedPayload);
 }
 
-// Delete crew
+// Update crew in crewDatabase (NEW)
+export async function updateCrewDatabaseInFirestore(
+  id: string,
+  payload: Partial<Omit<CrewMember, "id" | "createdAt">>
+) {
+  const docRef = doc(db, "crewDatabase", id);
+
+  const cleanedPayload = Object.fromEntries(
+    Object.entries(payload).filter(([_, v]) => v !== undefined)
+  );
+
+  await updateDoc(docRef, cleanedPayload);
+}
+
+// Delete crew from crewApplications
 export async function deleteCrewFromFirestore(id: string) {
   const docRef = doc(db, "crewApplications", id);
   await deleteDoc(docRef);
 }
 
-// Get all crews
+// Get all crew applications
 export async function getCrewApplications(): Promise<CrewMember[]> {
   const q = query(crewCollection, orderBy("createdAt", "desc"));
   const snapshot = await getDocs(q);
@@ -60,16 +85,15 @@ export async function getCrewApplications(): Promise<CrewMember[]> {
   return snapshot.docs.map((doc) => {
     const docData = doc.data() as Omit<CrewMember, "id">;
 
-    // Provide defaults for any missing fields (use sensible defaults)
     const crewMember: CrewMember = {
       id: doc.id,
-      rank: docData.rank ?? "", // Default value for rank if missing
-      createdAt: docData.createdAt ?? new Date().toISOString(), // Default to current timestamp
-      dateApplied: docData.dateApplied ?? "", // Default to empty string if missing
-      presentRank: docData.presentRank ?? "", // Default to empty string if missing
-      prevSalary: docData.prevSalary ?? "", // Default to empty string if missing
-      province: docData.province ?? "", 
-      dateOfAvailability: docData.dateOfAvailability ?? "", 
+      rank: docData.rank ?? "",
+      createdAt: docData.createdAt ?? new Date().toISOString(),
+      dateApplied: docData.dateApplied ?? "",
+      presentRank: docData.presentRank ?? "",
+      prevSalary: docData.prevSalary ?? "",
+      province: docData.province ?? "",
+      dateOfAvailability: docData.dateOfAvailability ?? "",
       expectedSalary: docData.expectedSalary ?? "",
       placeOfBirth: docData.placeOfBirth ?? "",
       numOfChildren: docData.numOfChildren ?? "",
@@ -88,7 +112,7 @@ export async function getCrewApplications(): Promise<CrewMember[]> {
       fathersName: docData.fathersName ?? "",
       mothersName: docData.mothersName ?? "",
       dateOfBirth: docData.dateOfBirth ?? "",
-      age: docData.age ?? 0, // Default to age 0 if missing
+      age: docData.age ?? 0,
       nationality: docData.nationality ?? "",
       gender: docData.gender ?? "",
       height: docData.height ?? "",
@@ -103,12 +127,23 @@ export async function getCrewApplications(): Promise<CrewMember[]> {
       seaService: docData.seaService ?? [],
       medical: docData.medical ?? { certificateType: "", issuingClinic: "", dateIssued: "", expiryDate: "" },
       vesselType: docData.vesselType ?? "",
-      status: docData.status ?? "pending", // Default to "pending" if missing
+      status: docData.status ?? "pending",
       remarks: docData.remarks ?? "",
     };
 
     return crewMember;
   });
+}
+
+// Get crew database (NEW)
+export async function getCrewDatabase(): Promise<CrewMember[]> {
+  const q = query(crewDatabaseCollection, orderBy("createdAt", "desc"));
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...(doc.data() as any),
+  })) as CrewMember[];
 }
 
 // Real-time Firestore Listener
@@ -118,8 +153,7 @@ export function listenCrewApplications(callback: (data: CrewMember[]) => void) {
   const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot) => {
     const data = snapshot.docs.map((doc) => {
       const docData = doc.data() as Omit<CrewMember, "id">;
-      
-      // Provide defaults for missing fields
+
       const crewMember: CrewMember = {
         id: doc.id,
         rank: docData.rank ?? "",
