@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { SuperAdminSidebar } from "@/app/components/SuperAdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 import { CrewMember } from "@/app/lib/dataStore";
-import { Search, Ship, X } from "lucide-react";
+import { Search, Ship, X, Edit2, Trash2 } from "lucide-react";
 
 import {
   updateCrewInFirestore,
@@ -18,6 +18,9 @@ import {
   addDoc,
   query,
   orderBy,
+  doc,
+  updateDoc,
+  deleteDoc,
 } from "firebase/firestore";
 
 type VesselAssignment = {
@@ -45,9 +48,16 @@ export default function VesselAssignment() {
   );
 
   const [showModal, setShowModal] = useState(false);
+  const [editAssignment, setEditAssignment] = useState<VesselAssignment | null>(
+    null
+  );
 
   // SEARCH
   const [crewSearch, setCrewSearch] = useState("");
+
+  // PAGINATION
+  const [page, setPage] = useState(1);
+  const perPage = 6;
 
   // Fetch crews
   useEffect(() => {
@@ -107,6 +117,23 @@ export default function VesselAssignment() {
     });
   }, [crews, crewSearch]);
 
+  // pagination for assignments
+  const totalPages = Math.ceil(vesselAssignments.length / perPage);
+  const paginatedAssignments = vesselAssignments.slice(
+    (page - 1) * perPage,
+    page * perPage
+  );
+
+  // Get current assignment info from crewExperience
+  const getCrewVesselInfo = (crew: CrewMember) => {
+    const vessel = crew.vesselExperience?.[0];
+    return {
+      vesselName: vessel?.vesselName || "—",
+      principal: vessel?.principal || "—",
+      vesselType: crew.vesselType || "—",
+    };
+  };
+
   // When crew selected -> autofill current data
   const handleCrewSelect = (id: string) => {
     const crew = crews.find((c) => c.id === id) || null;
@@ -134,21 +161,26 @@ export default function VesselAssignment() {
       return;
     }
 
-    // Update crew application document
+    const vesselExperience = [
+      {
+        vesselName: transferData.vesselName,
+        vesselType: transferData.vesselType,
+        principal: transferData.principal,
+        signedOn: new Date().toISOString().split("T")[0],
+        signedOff: null,
+      },
+    ];
+
     await updateCrewInFirestore(selectedCrew.id!, {
-      vesselName: transferData.vesselName,
-      vesselType: transferData.vesselType,
-      principal: transferData.principal,
+      vesselExperience,
       status: "assigned",
     });
 
-    // Update crew database document
     await updateCrewDatabaseInFirestore(selectedCrew.id!, {
-      vesselName: transferData.vesselName,
-      vesselType: transferData.vesselType,
-      principal: transferData.principal,
+      vesselExperience,
       status: "assigned",
     });
+
 
     // Save assignment to Firestore
     await addDoc(collection(db, "vesselAssignments"), {
@@ -164,6 +196,99 @@ export default function VesselAssignment() {
     setTransferData({ vesselName: "", vesselType: "", principal: "" });
     setCrewSearch("");
     setShowModal(false);
+  };
+
+// UNASSIGN
+const handleUnassign = async (assignmentId: string, crewId: string) => {
+  const confirmUnassign = confirm("Are you sure you want to unassign this crew?");
+  if (!confirmUnassign) return;
+
+  // Delete assignment document
+  await deleteDoc(doc(db, "vesselAssignments", assignmentId));
+
+  // Clear crew vessel data
+  await updateCrewInFirestore(crewId, {
+    vesselExperience: [],
+    vesselName: "",
+    vesselType: "",
+    principal: "",
+    status: "approved",
+  });
+
+  await updateCrewDatabaseInFirestore(crewId, {
+    vesselExperience: [],
+    vesselName: "",
+    vesselType: "",
+    principal: "",
+    status: "approved",
+  });
+
+  alert("Crew has been unassigned.");
+};
+
+
+  // EDIT ASSIGNMENT
+  const handleEditAssignment = async (assignment: VesselAssignment) => {
+    setEditAssignment(assignment);
+    setShowModal(true);
+
+    // Load existing data
+    setTransferData({
+      vesselName: assignment.vesselName,
+      vesselType: assignment.vesselType,
+      principal: assignment.principal,
+    });
+
+    // Select the crew
+    const crew = crews.find((c) => c.id === assignment.crewId) || null;
+    setSelectedCrew(crew);
+  };
+
+  const handleUpdateAssignment = async () => {
+    if (!selectedCrew || !editAssignment) return;
+
+    const docRef = doc(db, "vesselAssignments", editAssignment.id!);
+
+    await updateDoc(docRef, {
+      vesselName: transferData.vesselName,
+      vesselType: transferData.vesselType,
+      principal: transferData.principal,
+    });
+
+    // Update crew document
+    await updateCrewInFirestore(selectedCrew.id!, {
+      vesselExperience: [
+        {
+          vesselName: transferData.vesselName,
+          vesselType: transferData.vesselType,
+          principal: transferData.principal,
+          signedOn: editAssignment.assignedDate,
+          signedOff: null,
+        },
+      ],
+      vesselName: transferData.vesselName,
+      vesselType: transferData.vesselType,
+      principal: transferData.principal,
+    });
+
+    await updateCrewDatabaseInFirestore(selectedCrew.id!, {
+      vesselExperience: [
+        {
+          vesselName: transferData.vesselName,
+          vesselType: transferData.vesselType,
+          principal: transferData.principal,
+          signedOn: editAssignment.assignedDate,
+          signedOff: null,
+        },
+      ],
+      vesselName: transferData.vesselName,
+      vesselType: transferData.vesselType,
+      principal: transferData.principal,
+    });
+
+    setEditAssignment(null);
+    setShowModal(false);
+    alert("Assignment updated!");
   };
 
   return (
@@ -182,7 +307,6 @@ export default function VesselAssignment() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-
             {/* SELECT CREW */}
             <div className="bg-white rounded-lg shadow-md p-6">
               <h2 className="text-xl font-bold text-[#002060] mb-4">
@@ -229,18 +353,29 @@ export default function VesselAssignment() {
                 </h3>
 
                 <div className="mt-2 space-y-2">
-                  <div className="text-sm text-gray-700">
-                    <span className="font-semibold">Vessel Name:</span>{" "}
-                    {selectedCrew?.vesselName || "—"}
-                  </div>
-                  <div className="text-sm text-gray-700">
-                    <span className="font-semibold">Vessel Type:</span>{" "}
-                    {selectedCrew?.vesselType || "—"}
-                  </div>
-                  <div className="text-sm text-gray-700">
-                    <span className="font-semibold">Principal:</span>{" "}
-                    {selectedCrew?.principal || "—"}
-                  </div>
+                  {selectedCrew ? (
+                    (() => {
+                      const info = getCrewVesselInfo(selectedCrew);
+                      return (
+                        <>
+                          <div className="text-sm text-gray-700">
+                            <span className="font-semibold">Vessel Name:</span>{" "}
+                            {info.vesselName}
+                          </div>
+                          <div className="text-sm text-gray-700">
+                            <span className="font-semibold">Vessel Type:</span>{" "}
+                            {info.vesselType}
+                          </div>
+                          <div className="text-sm text-gray-700">
+                            <span className="font-semibold">Principal:</span>{" "}
+                            {info.principal}
+                          </div>
+                        </>
+                      );
+                    })()
+                  ) : (
+                    <div className="text-sm text-gray-500">Select a crew</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -256,41 +391,94 @@ export default function VesselAssignment() {
                 </span>
               </div>
 
-              {vesselAssignments.length === 0 ? (
+              {paginatedAssignments.length === 0 ? (
                 <div className="text-center py-10 text-gray-500">
                   No assignments yet.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {vesselAssignments.map((a) => (
-                    <div
-                      key={a.id}
-                      className="border p-4 rounded-lg shadow-sm hover:shadow-md transition"
-                    >
-                      <div className="flex justify-between items-center mb-2">
-                        <p className="font-bold text-[#002060]">
-                          {a.crewName}
+                  {paginatedAssignments.map((a) => {
+                    const crew = crews.find((c) => c.id === a.crewId);
+                    return (
+                      <div
+                        key={a.id}
+                        className="border p-4 rounded-lg shadow-sm hover:shadow-md transition"
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <p className="font-bold text-[#002060]">
+                            {a.crewName}
+                          </p>
+                          <span className="text-xs text-gray-500">
+                            {a.assignedDate}
+                          </span>
+                        </div>
+
+                        <p className="text-gray-700">
+                          <span className="font-semibold">Status:</span>{" "}
+                          {crew?.status || "—"}
                         </p>
-                        <span className="text-xs text-gray-500">
-                          {a.assignedDate}
-                        </span>
+
+                        <p className="text-gray-700">
+                          <span className="font-semibold">Vessel:</span>{" "}
+                          {a.vesselName}
+                        </p>
+                        <p className="text-gray-700">
+                          <span className="font-semibold">Type:</span>{" "}
+                          {a.vesselType}
+                        </p>
+                        <p className="text-gray-700">
+                          <span className="font-semibold">Principal:</span>{" "}
+                          {a.principal}
+                        </p>
+
+                        <div className="flex gap-2 justify-end mt-3">
+                          <button
+                            className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
+                            onClick={() => handleEditAssignment(a)}
+                            title="Edit Assignment"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
+                            onClick={() => handleUnassign(a.id!, a.crewId)}
+                            title="Unassign"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+
+                        </div>
                       </div>
-                      <p className="text-gray-700">
-                        <span className="font-semibold">Vessel:</span>{" "}
-                        {a.vesselName}
-                      </p>
-                      <p className="text-gray-700">
-                        <span className="font-semibold">Type:</span>{" "}
-                        {a.vesselType}
-                      </p>
-                      <p className="text-gray-700">
-                        <span className="font-semibold">Principal:</span>{" "}
-                        {a.principal}
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
+
+              {/* PAGINATION */}
+              <div className="flex justify-between items-center mt-6">
+                <span className="text-sm text-gray-600">
+                  Page {page} of {totalPages}
+                </span>
+
+                <div className="flex gap-2">
+                  <button
+                    disabled={page === 1}
+                    onClick={() => setPage((p) => p - 1)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+
+                  <button
+                    disabled={page === totalPages}
+                    onClick={() => setPage((p) => p + 1)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -302,17 +490,26 @@ export default function VesselAssignment() {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-bold flex items-center gap-2">
                   <Ship className="w-5 h-5 text-blue-600" />
-                  Assign Vessel
+                  {editAssignment ? "Edit Assignment" : "Assign Vessel"}
                 </h2>
                 <button
                   className="text-gray-600 hover:text-gray-800"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => {
+                    setShowModal(false);
+                    setEditAssignment(null);
+                  }}
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleAssignVessel} className="space-y-4">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  editAssignment ? handleUpdateAssignment() : handleAssignVessel(e);
+                }}
+                className="space-y-4"
+              >
                 <label className="text-sm font-semibold text-[#002060]">
                   Vessel Name
                 </label>
@@ -372,7 +569,10 @@ export default function VesselAssignment() {
                   <button
                     type="button"
                     className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
-                    onClick={() => setShowModal(false)}
+                    onClick={() => {
+                      setShowModal(false);
+                      setEditAssignment(null);
+                    }}
                   >
                     Cancel
                   </button>
@@ -381,7 +581,7 @@ export default function VesselAssignment() {
                     type="submit"
                     className="px-4 py-2 rounded-lg bg-[#0080C0] text-white hover:bg-blue-700 transition"
                   >
-                    Assign Vessel
+                    {editAssignment ? "Update Assignment" : "Assign Vessel"}
                   </button>
                 </div>
               </form>

@@ -18,6 +18,7 @@ import jsPDF from "jspdf";
 
 import {
   updateCrewInFirestore,
+  updateCrewDatabaseInFirestore,
   deleteCrewFromFirestore,
 } from "@/app/lib/crewservice";
 
@@ -62,29 +63,43 @@ export default function SuperAdminCrewApplications() {
   }, [searchQuery, statusFilter]);
 
   const handleApprove = async (id: string) => {
-    await updateCrewInFirestore(id, { status: "approved" });
+    const payload = { status: "approved" };
+
+    await updateCrewInFirestore(id, payload);
+    await updateCrewDatabaseInFirestore(id, payload);
+
     setSelectedCrew(null);
     setStatusFilter("all");
   };
 
   const handleDisapprove = async (id: string, reconsider?: boolean) => {
-    if (reconsider) {
-      await updateCrewInFirestore(id, { status: "fooled" });
-    } else {
-      await updateCrewInFirestore(id, { status: "disapproved" });
-    }
+    const payload = {
+      status: reconsider ? "fooled" : "disapproved",
+    };
+
+    await updateCrewInFirestore(id, payload);
+    await updateCrewDatabaseInFirestore(id, payload);
+
     setSelectedCrew(null);
     setStatusFilter("all");
   };
 
   const handleProposed = async (id: string) => {
-    await updateCrewInFirestore(id, { status: "proposed" });
+    const payload = { status: "proposed" };
+
+    await updateCrewInFirestore(id, payload);
+    await updateCrewDatabaseInFirestore(id, payload);
+
     setSelectedCrew(null);
     setStatusFilter("all");
   };
 
   const handleFooled = async (id: string) => {
-    await updateCrewInFirestore(id, { status: "fooled" });
+    const payload = { status: "fooled" };
+
+    await updateCrewInFirestore(id, payload);
+    await updateCrewDatabaseInFirestore(id, payload);
+
     setSelectedCrew(null);
     setStatusFilter("all");
   };
@@ -111,14 +126,14 @@ export default function SuperAdminCrewApplications() {
     return Math.abs(ageDate.getUTCFullYear() - 1970);
   };
 
-  // NEW: fetch vessel data for each crew
+  // 🔥 FIXED: expiryDate now uses signedOff
   const getVesselInfo = (crew: CrewMember) => {
-    const vessel = crew.vesselExperience?.[0];
+    const lastVessel = crew.vesselExperience?.[0];
 
     return {
-      vesselName: vessel?.vesselName || "—",
-      principal: vessel?.principal || "—",
-      expiryDate: vessel?.signedOff || "—",
+      vesselName: lastVessel?.vesselName || "—",
+      principal: lastVessel?.principal || "—",
+      signedOff: lastVessel?.signedOn || "—",  // <--- CHANGE THIS
     };
   };
 
@@ -161,7 +176,7 @@ export default function SuperAdminCrewApplications() {
       doc.text(`Vessel Type: ${crew.vesselType}`, 14, y + 12);
       doc.text(`Vessel Name: ${vesselInfo.vesselName}`, 14, y + 18);
       doc.text(`Principal: ${vesselInfo.principal}`, 14, y + 24);
-      doc.text(`Expiry Date: ${vesselInfo.expiryDate}`, 14, y + 30);
+      doc.text(`Signed Off: ${vesselInfo.signedOff}`, 14, y + 30);
       doc.text(`Age: ${getAge(crew.dateOfBirth)}`, 14, y + 36);
       doc.text(`Email: ${crew.emailAddress}`, 14, y + 42);
       doc.text(`Status: ${crew.status.toUpperCase()}`, 14, y + 48);
@@ -192,7 +207,6 @@ export default function SuperAdminCrewApplications() {
           </div>
 
           <div className="pt-24 px-6 pb-10">
-
             {/* CONTROLS */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
               <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg shadow-sm border">
@@ -253,7 +267,7 @@ export default function SuperAdminCrewApplications() {
                       Principal
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
-                      Expiry Date
+                      Signed Off
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
                       Age
@@ -295,7 +309,7 @@ export default function SuperAdminCrewApplications() {
                           {vesselInfo.principal}
                         </td>
                         <td className="px-6 py-4 text-center text-gray-600">
-                          {vesselInfo.expiryDate}
+                          {vesselInfo.signedOff}
                         </td>
                         <td className="px-6 py-4 text-center text-gray-600">
                           {getAge(crew.dateOfBirth)}

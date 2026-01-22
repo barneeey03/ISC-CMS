@@ -68,8 +68,10 @@ export async function updateCrewDatabaseInFirestore(
     Object.entries(payload).filter(([_, v]) => v !== undefined)
   );
 
-  await updateDoc(docRef, cleanedPayload);
+  // 🔥 Use setDoc merge so it won't fail if doc doesn't exist
+  await setDoc(docRef, cleanedPayload, { merge: true });
 }
+
 
 // Delete crew from crewApplications
 export async function deleteCrewFromFirestore(id: string) {

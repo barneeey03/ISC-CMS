@@ -23,15 +23,11 @@ import {
   deleteCrewFromFirestore,
 } from "@/app/lib/crewservice";
 
-import { getVesselExperiences } from "@/app/lib/vesselservice"; // <-- NEW
-
 export default function CrewApplications() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
 
   const [crews, setCrews] = useState<CrewMember[]>([]);
-  const [vesselExperiences, setVesselExperiences] = useState<any[]>([]); // <-- NEW
-
   const [selectedCrew, setSelectedCrew] = useState<CrewMember | null>(null);
   const [editCrew, setEditCrew] = useState<CrewMember | null>(null);
 
@@ -43,33 +39,22 @@ export default function CrewApplications() {
   const [page, setPage] = useState(1);
   const perPage = 8;
 
-  // NEW: Delete Confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const refreshCrews = useCallback(async () => {
-    const crewList = await getCrewApplications();
-    const vesselList = await getVesselExperiences(); // <-- NEW
-
-    setCrews(crewList);
-    setVesselExperiences(vesselList); // <-- NEW
+    const list = await getCrewApplications();
+    setCrews(list);
   }, []);
 
   useEffect(() => {
     refreshCrews();
   }, [refreshCrews]);
 
-  // RESET PAGE WHEN FILTER OR SEARCH CHANGES
   useEffect(() => {
     setPage(1);
   }, [searchQuery, statusFilter]);
-
-  const handleProposed = async (id: string) => {
-    await updateCrewInFirestore(id, { status: "proposed" });
-    await refreshCrews();
-    setSelectedCrew(null);
-    setStatusFilter("all");
-  };
+  
 
   const handleApprove = async (id: string) => {
     await updateCrewInFirestore(id, { status: "approved" });
@@ -79,11 +64,16 @@ export default function CrewApplications() {
   };
 
   const handleDisapprove = async (id: string, reconsider?: boolean) => {
-    if (reconsider) {
-      await updateCrewInFirestore(id, { status: "fooled" });
-    } else {
-      await updateCrewInFirestore(id, { status: "disapproved" });
-    }
+    await updateCrewInFirestore(id, {
+      status: reconsider ? "fooled" : "disapproved",
+    });
+    await refreshCrews();
+    setSelectedCrew(null);
+    setStatusFilter("all");
+  };
+
+  const handleProposed = async (id: string) => {
+    await updateCrewInFirestore(id, { status: "proposed" });
     await refreshCrews();
     setSelectedCrew(null);
     setStatusFilter("all");
@@ -96,10 +86,8 @@ export default function CrewApplications() {
     setStatusFilter("all");
   };
 
-  // Delete action (triggered by modal)
   const confirmDelete = async () => {
     if (!deleteTargetId) return;
-
     await deleteCrewFromFirestore(deleteTargetId);
     await refreshCrews();
     setShowDeleteConfirm(false);
@@ -111,28 +99,22 @@ export default function CrewApplications() {
     setShowEditForm(true);
   };
 
-  const getAge = (dob: string | undefined) => {
+  const getAge = (dob?: string) => {
     if (!dob) return "—";
-    const birthDate = new Date(dob);
-    if (isNaN(birthDate.getTime())) return "—";
-
-    const diff = Date.now() - birthDate.getTime();
-    const ageDate = new Date(diff);
-    return Math.abs(ageDate.getUTCFullYear() - 1970);
+    const birth = new Date(dob);
+    if (isNaN(birth.getTime())) return "—";
+    return Math.abs(new Date(Date.now() - birth.getTime()).getUTCFullYear() - 1970);
   };
 
-  // NEW: fetch vessel data for each crew
   const getVesselInfo = (crew: CrewMember) => {
-  // If vesselExperience is an array, use the first item
-  const vessel = crew.vesselExperience?.[0];
+    const lastVessel = crew.vesselExperience?.[0];
 
-  return {
-    vesselName: vessel?.vesselName || "—",
-    principal: vessel?.principal || "—",
-    expiryDate: vessel?.signedOff || "—", // <-- FIXED
+    return {
+      vesselName: lastVessel?.vesselName || "—",
+      principal: lastVessel?.principal || "—",
+      signedOff: lastVessel?.signedOn || "—",  // <--- CHANGE THIS
+    };
   };
-};
-
 
   const filteredCrews = useMemo(() => {
     let list = crews.filter((crew) => {
@@ -165,15 +147,15 @@ export default function CrewApplications() {
     let y = 35;
 
     paginatedCrews.forEach((crew, index) => {
-      const vesselInfo = getVesselInfo(crew); // <-- NEW
+      const vessel = getVesselInfo(crew);
 
       doc.setFontSize(11);
       doc.text(`${index + 1}. ${crew.fullName}`, 14, y);
       doc.text(`Rank: ${crew.presentRank}`, 14, y + 6);
       doc.text(`Vessel Type: ${crew.vesselType}`, 14, y + 12);
-      doc.text(`Vessel Name: ${vesselInfo.vesselName}`, 14, y + 18);
-      doc.text(`Principal: ${vesselInfo.principal}`, 14, y + 24);
-      doc.text(`Expiry Date: ${vesselInfo.expiryDate}`, 14, y + 30);
+      doc.text(`Vessel Name: ${vessel.vesselName}`, 14, y + 18);
+      doc.text(`Principal: ${vessel.principal}`, 14, y + 24);
+      doc.text(`Signed Off: ${vessel.signedOff}`, 14, y + 30);
       doc.text(`Age: ${getAge(crew.dateOfBirth)}`, 14, y + 36);
       doc.text(`Email: ${crew.emailAddress}`, 14, y + 42);
       doc.text(`Status: ${crew.status.toUpperCase()}`, 14, y + 48);
@@ -321,7 +303,7 @@ export default function CrewApplications() {
                           {vesselInfo.principal}
                         </td>
                         <td className="px-6 py-4 text-center text-gray-600">
-                          {vesselInfo.expiryDate}
+                          {vesselInfo.signedOff}
                         </td>
 
                         <td className="px-6 py-4 text-center text-gray-600">
