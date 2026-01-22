@@ -3,11 +3,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { SuperAdminSidebar } from "@/app/components/SuperAdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
-import { Search, Download, ArrowUpDown } from "lucide-react";
+import { Search, Download, ArrowUpDown, FileText } from "lucide-react";
 import { onSnapshot, collection } from "firebase/firestore";
 import { db } from "@/app/lib/firebase";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 
 type CrewType = any;
 
@@ -85,7 +87,6 @@ export default function CrewDatabase() {
 
   const loadMore = () => setItemsToShow((prev) => prev + 10);
 
-  // Infinite Scroll
   useEffect(() => {
     const handleScroll = () => {
       if (
@@ -133,13 +134,44 @@ export default function CrewDatabase() {
     saveAs(file, "crew_database.xlsx");
   };
 
+  // Export to PDF
+  const exportPDF = () => {
+  const doc = new jsPDF();
+  doc.setFontSize(18);
+  doc.text("Crew Database", 14, 22);
+
+  const headers = [["Name", "Rank", "Vessel", "Age", "Email", "Status"]];
+
+  const rows = filteredCrews.map((c) => [
+    c.fullName,
+    c.presentRank,
+    c.vesselType || "N/A",
+    c.age || "—",
+    c.emailAddress,
+    c.status.toUpperCase(),
+  ]);
+
+  (doc as any).autoTable({
+    head: headers,
+    body: rows,
+    startY: 30,
+    theme: "grid",
+    headStyles: { fillColor: [10, 165, 233] },
+  });
+
+  doc.save("crew_database.pdf");
+};
+
+
   return (
     <ProtectedRoute requiredRole="super-admin">
       <div className="flex min-h-screen bg-[#F5F9FC]">
         <SuperAdminSidebar />
 
         <div className="flex-1 ml-64">
-          <div className="bg-white border-b border-[#E0E8F0] p-5">
+       {/* Header */}
+        <div className="bg-white border-b border-[#E0E8F0] p-6">
+          <div>
             <h1 className="text-2xl font-extrabold text-[#002060]">
               Crew Database
             </h1>
@@ -147,17 +179,38 @@ export default function CrewDatabase() {
               Professional compact view with filters & infinite scroll
             </p>
           </div>
+        </div>
 
-          <div className="p-5">
-            {/* Filters */}
-            <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+        {/* Export Buttons (Outside header, right aligned) */}
+        <div className="flex justify-end mt-4 px-6">
+          <button
+            onClick={exportPDF}
+            className="flex items-center gap-2 px-5 py-2 rounded-lg bg-[#00ba03] text-white text-sm hover:bg-[#00e00b] transition"
+          >
+            <FileText className="w-4 h-4" />
+            Export PDF
+          </button>
+
+          <button
+            onClick={exportExcel}
+            className="flex items-center gap-2 px-5 py-2 rounded-lg bg-[#0EA5E9] text-white text-sm hover:bg-[#0284C7] transition"
+          >
+            <Download className="w-4 h-4" />
+            Export Excel
+          </button>
+        </div>
+        
+
+          {/* Filters */}
+          <div className="p-6">
+            <div className="bg-white rounded-lg shadow-sm p-5">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#80A0C0]" />
                   <input
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-[#D0E0F0] bg-[#F9FBFD] text-[#002060] placeholder-[#80A0C0] text-sm"
+                    className="w-full pl-10 pr-4 py-3 rounded-lg border border-[#D0E0F0] bg-[#F9FBFD] text-[#002060] placeholder-[#80A0C0] text-sm"
                     placeholder="Search email or name"
                   />
                 </div>
@@ -165,28 +218,28 @@ export default function CrewDatabase() {
                 <input
                   value={filterName}
                   onChange={(e) => setFilterName(e.target.value)}
-                  className="px-4 py-2 rounded-lg border border-[#D0E0F0] bg-[#F9FBFD] text-[#002060] text-sm"
+                  className="px-4 py-3 rounded-lg border border-[#D0E0F0] bg-[#F9FBFD] text-[#002060] text-sm"
                   placeholder="Filter by Name"
                 />
 
                 <input
                   value={filterRank}
                   onChange={(e) => setFilterRank(e.target.value)}
-                  className="px-4 py-2 rounded-lg border border-[#D0E0F0] bg-[#F9FBFD] text-[#002060] text-sm"
+                  className="px-4 py-3 rounded-lg border border-[#D0E0F0] bg-[#F9FBFD] text-[#002060] text-sm"
                   placeholder="Filter by Rank"
                 />
 
                 <input
                   value={filterVessel}
                   onChange={(e) => setFilterVessel(e.target.value)}
-                  className="px-4 py-2 rounded-lg border border-[#D0E0F0] bg-[#F9FBFD] text-[#002060] text-sm"
+                  className="px-4 py-3 rounded-lg border border-[#D0E0F0] bg-[#F9FBFD] text-[#002060] text-sm"
                   placeholder="Filter by Vessel"
                 />
 
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value as any)}
-                  className="px-4 py-2 rounded-lg border border-[#D0E0F0] bg-[#F9FBFD] text-[#002060] text-sm"
+                  className="px-4 py-3 rounded-lg border border-[#D0E0F0] bg-[#F9FBFD] text-[#002060] text-sm"
                 >
                   <option value="all">All Status</option>
                   <option value="approved">Approved</option>
@@ -197,43 +250,9 @@ export default function CrewDatabase() {
                 </select>
               </div>
 
-              <div className="flex justify-end gap-2 mt-3">
-                <button
-                  onClick={exportExcel}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0EA5E9] text-white text-sm hover:bg-[#0284C7]"
-                >
-                  <Download className="w-4 h-4" />
-                  Export Excel
-                </button>
-              </div>
             </div>
-
-            {/* Status Legend */}
-            <div className="flex gap-2 mb-3">
-              {[
-                { label: "Approved", color: "#22C55E" },
-                { label: "Pending", color: "#F59E0B" },
-                { label: "Proposed", color: "#8B5CF6" },
-                { label: "Disapproved", color: "#EF4444" },
-                { label: "Fooled", color: "#0EA5E9" },
-              ].map((s) => (
-                <div
-                  key={s.label}
-                  className="flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#E0E8F0]"
-                >
-                  <span
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: s.color }}
-                  />
-                  <span className="text-xs text-[#002060] font-semibold">
-                    {s.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-
             {/* Table */}
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden mt-5">
               <table className="min-w-full text-sm">
                 <thead className="bg-[#F1F7FB]">
                   <tr>
