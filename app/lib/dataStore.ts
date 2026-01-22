@@ -1,5 +1,3 @@
-import { ReactNode } from "react"; // Import ReactNode for index signature
-
 export type Certificate = {
   id: string;
   name: string;
@@ -9,6 +7,7 @@ export type Certificate = {
 };
 
 export type VesselExperience = {
+  expiryDate: string;
   id: string;
   manningCompany: string;
   principal: string;
@@ -105,6 +104,12 @@ export interface CrewMember {
 
   vesselType: string;
 
+  // ✅ NEW FIELDS
+  vesselExperienceId?: string;
+  vesselName?: string;
+  principal?: string;
+  expiryDate?: string;
+
   status: "pending" | "proposed" | "approved" | "disapproved" | "fooled";
   remarks: string;
 }
@@ -162,7 +167,9 @@ class DataStore {
       seaService: [], // Default empty array
       medical: { certificateType: "", issuingClinic: "", dateIssued: "", expiryDate: "" }, // Default empty object
       vesselType: "", // Default empty string
-      remarks: "", // Default empty string
+      remarks: "",
+      vesselName: "",
+      principal: ""
     };
 
     this.crews.set(id, newCrew);

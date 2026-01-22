@@ -5,7 +5,7 @@ export type CrewMemberStatus =
   | "disapproved"
   | "fooled"
   | "assigned";
-  
+
 export type Certificate = {
   id: string;
   name: string;
@@ -110,6 +110,12 @@ export interface CrewMember {
   };
 
   vesselType: string;
+
+  // ✅ NEW FIELDS
+  vesselExperienceId?: string;
+  vesselName?: string;
+  principal?: string;
+  expiryDate?: string;
 
   status: CrewMemberStatus;
   remarks: string;

@@ -17,7 +17,6 @@ import {
 import jsPDF from "jspdf";
 
 import {
-  getCrewApplications,
   updateCrewInFirestore,
   deleteCrewFromFirestore,
 } from "@/app/lib/crewservice";
@@ -112,12 +111,16 @@ export default function SuperAdminCrewApplications() {
     return Math.abs(ageDate.getUTCFullYear() - 1970);
   };
 
-  // STATS CARDS
-  const pendingCrews = crews.filter((c) => c.status === "pending");
-  const approvedCrews = crews.filter((c) => c.status === "approved");
-  const disapprovedCrews = crews.filter((c) => c.status === "disapproved");
-  const fooledCrews = crews.filter((c) => c.status === "fooled");
-  const proposedCrews = crews.filter((c) => c.status === "proposed");
+  // NEW: fetch vessel data for each crew
+  const getVesselInfo = (crew: CrewMember) => {
+    const vessel = crew.vesselExperience?.[0];
+
+    return {
+      vesselName: vessel?.vesselName || "—",
+      principal: vessel?.principal || "—",
+      expiryDate: vessel?.signedOff || "—",
+    };
+  };
 
   const filteredCrews = useMemo(() => {
     let list = crews.filter((crew) => {
@@ -150,16 +153,21 @@ export default function SuperAdminCrewApplications() {
     let y = 35;
 
     paginatedCrews.forEach((crew, index) => {
+      const vesselInfo = getVesselInfo(crew);
+
       doc.setFontSize(11);
       doc.text(`${index + 1}. ${crew.fullName}`, 14, y);
       doc.text(`Rank: ${crew.presentRank}`, 14, y + 6);
       doc.text(`Vessel Type: ${crew.vesselType}`, 14, y + 12);
-      doc.text(`Age: ${getAge(crew.dateOfBirth)}`, 14, y + 18);
-      doc.text(`Email: ${crew.emailAddress}`, 14, y + 24);
-      doc.text(`Status: ${crew.status.toUpperCase()}`, 14, y + 30);
-      doc.text(`Remarks: ${crew.remarks || "—"}`, 14, y + 36);
+      doc.text(`Vessel Name: ${vesselInfo.vesselName}`, 14, y + 18);
+      doc.text(`Principal: ${vesselInfo.principal}`, 14, y + 24);
+      doc.text(`Expiry Date: ${vesselInfo.expiryDate}`, 14, y + 30);
+      doc.text(`Age: ${getAge(crew.dateOfBirth)}`, 14, y + 36);
+      doc.text(`Email: ${crew.emailAddress}`, 14, y + 42);
+      doc.text(`Status: ${crew.status.toUpperCase()}`, 14, y + 48);
+      doc.text(`Remarks: ${crew.remarks || "—"}`, 14, y + 54);
 
-      y += 50;
+      y += 60;
       if (y > 270) {
         doc.addPage();
         y = 20;
@@ -185,70 +193,7 @@ export default function SuperAdminCrewApplications() {
 
           <div className="pt-24 px-6 pb-10">
 
-            {/* ===== STATS CARDS ===== */}
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
-              <button
-                className="bg-white rounded-xl p-4 border border-gray-200 hover:bg-gray-50"
-                onClick={() => setStatusFilter("all")}
-              >
-                <p className="text-sm text-gray-500">Total Applications</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {crews.length}
-                </p>
-              </button>
-
-              <button
-                className="bg-white rounded-xl p-4 border border-gray-200 hover:bg-gray-50"
-                onClick={() => setStatusFilter("pending")}
-              >
-                <p className="text-sm text-gray-500">Pending</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {pendingCrews.length}
-                </p>
-              </button>
-
-              <button
-                className="bg-white rounded-xl p-4 border border-gray-200 hover:bg-gray-50"
-                onClick={() => setStatusFilter("proposed")}
-              >
-                <p className="text-sm text-gray-500">Proposed</p>
-                <p className="text-2xl font-bold text-yellow-600">
-                  {proposedCrews.length}
-                </p>
-              </button>
-
-              <button
-                className="bg-white rounded-xl p-4 border border-gray-200 hover:bg-gray-50"
-                onClick={() => setStatusFilter("approved")}
-              >
-                <p className="text-sm text-gray-500">Approved</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {approvedCrews.length}
-                </p>
-              </button>
-
-              <button
-                className="bg-white rounded-xl p-4 border border-gray-200 hover:bg-gray-50"
-                onClick={() => setStatusFilter("disapproved")}
-              >
-                <p className="text-sm text-gray-500">Disapproved</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {disapprovedCrews.length}
-                </p>
-              </button>
-
-              <button
-                className="bg-white rounded-xl p-4 border border-gray-200 hover:bg-gray-50"
-                onClick={() => setStatusFilter("fooled")}
-              >
-                <p className="text-sm text-gray-500">Fooled</p>
-                <p className="text-2xl font-bold text-purple-600">
-                  {fooledCrews.length}
-                </p>
-              </button>
-            </div>
-
-            {/* ===== CONTROLS ===== */}
+            {/* CONTROLS */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
               <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg shadow-sm border">
                 <Search className="w-4 h-4 text-gray-400" />
@@ -287,8 +232,8 @@ export default function SuperAdminCrewApplications() {
               </div>
             </div>
 
-            {/* ===== TABLE ===== */}
-            <div className="overflow-x-auto overflow-y-auto max-h-130 bg-white rounded-xl shadow border">
+            {/* TABLE */}
+            <div className="overflow-x-auto bg-white rounded-xl shadow border">
               <table className="min-w-full divide-y">
                 <thead className="bg-blue-200">
                   <tr>
@@ -300,6 +245,15 @@ export default function SuperAdminCrewApplications() {
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
                       Vessel Type
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
+                      Vessel Name
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
+                      Principal
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
+                      Expiry Date
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
                       Age
@@ -320,81 +274,95 @@ export default function SuperAdminCrewApplications() {
                 </thead>
 
                 <tbody className="divide-y bg-white">
-                  {paginatedCrews.map((crew) => (
-                    <tr key={crew.id} className="hover:bg-blue-50">
-                      <td className="px-6 py-4 text-center text-gray-600">
-                        {crew.presentRank}
-                      </td>
-                      <td className="px-6 py-4 text-center font-medium text-gray-800">
-                        {crew.fullName}
-                      </td>
-                      <td className="px-6 py-4 text-center text-gray-600">
-                        {crew.vesselType}
-                      </td>
-                      <td className="px-6 py-4 text-center text-gray-600">
-                        {getAge(crew.dateOfBirth)}
-                      </td>
-                      <td className="px-6 py-4 text-center text-gray-600">
-                        {crew.emailAddress}
-                      </td>
+                  {paginatedCrews.map((crew) => {
+                    const vesselInfo = getVesselInfo(crew);
 
-                      <td className="px-6 py-4 text-center">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold
-                            ${crew.status === "approved"
-                              ? "bg-green-100 text-green-700"
-                              : crew.status === "proposed"
-                              ? "bg-yellow-100 text-yellow-700"
-                              : crew.status === "pending"
-                              ? "bg-orange-100 text-orange-700"
-                              : crew.status === "fooled"
-                              ? "bg-purple-100 text-purple-700"
-                              : "bg-red-100 text-red-700"}`}
-                        >
-                          {crew.status.toUpperCase()}
-                        </span>
-                      </td>
+                    return (
+                      <tr key={crew.id} className="hover:bg-blue-50">
+                        <td className="px-6 py-4 text-center text-gray-600">
+                          {crew.presentRank}
+                        </td>
+                        <td className="px-6 py-4 text-center font-medium text-gray-800">
+                          {crew.fullName}
+                        </td>
+                        <td className="px-6 py-4 text-center text-gray-600">
+                          {crew.vesselType}
+                        </td>
+                        <td className="px-6 py-4 text-center text-gray-600">
+                          {vesselInfo.vesselName}
+                        </td>
+                        <td className="px-6 py-4 text-center text-gray-600">
+                          {vesselInfo.principal}
+                        </td>
+                        <td className="px-6 py-4 text-center text-gray-600">
+                          {vesselInfo.expiryDate}
+                        </td>
+                        <td className="px-6 py-4 text-center text-gray-600">
+                          {getAge(crew.dateOfBirth)}
+                        </td>
+                        <td className="px-6 py-4 text-center text-gray-600">
+                          {crew.emailAddress}
+                        </td>
 
-                      <td className="px-6 py-4 text-center text-gray-600">
-                        {crew.remarks || "No remarks"}
-                      </td>
-
-                      <td className="px-6 py-4">
-                        <div className="flex gap-2 justify-center">
-                          <button
-                            onClick={() => setSelectedCrew(crew)}
-                            className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
-                            title="View Details"
+                        <td className="px-6 py-4 text-center">
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-semibold
+                              ${crew.status === "approved"
+                                ? "bg-green-100 text-green-700"
+                                : crew.status === "proposed"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : crew.status === "pending"
+                                ? "bg-orange-600 text-gray-900"
+                                : crew.status === "fooled"
+                                ? "bg-orange-100 text-orange-700"
+                                : "bg-red-100 text-red-700"}`}
                           >
-                            <Eye className="w-4 h-4" />
-                          </button>
+                            {crew.status.toUpperCase()}
+                          </span>
+                        </td>
 
-                          <button
-                            onClick={() => handleEdit(crew)}
-                            className="p-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition"
-                            title="Edit"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
+                        <td className="px-6 py-4 text-center text-gray-600">
+                          {crew.remarks || "No remarks"}
+                        </td>
 
-                          <button
-                            onClick={() => {
-                              setDeleteTargetId(crew.id);
-                              setShowDeleteConfirm(true);
-                            }}
-                            className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        <td className="px-6 py-4">
+                          <div className="flex gap-2 justify-center">
+                            <button
+                              onClick={() => setSelectedCrew(crew)}
+                              className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
+                              title="View Details"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              onClick={() => handleEdit(crew)}
+                              className="p-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition"
+                              title="Edit"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setDeleteTargetId(crew.id);
+                                setShowDeleteConfirm(true);
+                              }}
+                              className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
+            {/* PAGINATION */}
             <div className="flex justify-between items-center mt-6">
               <span className="text-sm text-gray-600">
                 Page {page} of {totalPages}
@@ -465,7 +433,6 @@ export default function SuperAdminCrewApplications() {
               </div>
             </div>
           )}
-
         </div>
       </div>
     </ProtectedRoute>

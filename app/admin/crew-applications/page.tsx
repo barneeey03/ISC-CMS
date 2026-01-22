@@ -23,11 +23,15 @@ import {
   deleteCrewFromFirestore,
 } from "@/app/lib/crewservice";
 
+import { getVesselExperiences } from "@/app/lib/vesselservice"; // <-- NEW
+
 export default function CrewApplications() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
 
   const [crews, setCrews] = useState<CrewMember[]>([]);
+  const [vesselExperiences, setVesselExperiences] = useState<any[]>([]); // <-- NEW
+
   const [selectedCrew, setSelectedCrew] = useState<CrewMember | null>(null);
   const [editCrew, setEditCrew] = useState<CrewMember | null>(null);
 
@@ -44,8 +48,11 @@ export default function CrewApplications() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const refreshCrews = useCallback(async () => {
-    const list = await getCrewApplications();
-    setCrews(list);
+    const crewList = await getCrewApplications();
+    const vesselList = await getVesselExperiences(); // <-- NEW
+
+    setCrews(crewList);
+    setVesselExperiences(vesselList); // <-- NEW
   }, []);
 
   useEffect(() => {
@@ -114,6 +121,19 @@ export default function CrewApplications() {
     return Math.abs(ageDate.getUTCFullYear() - 1970);
   };
 
+  // NEW: fetch vessel data for each crew
+  const getVesselInfo = (crew: CrewMember) => {
+  // If vesselExperience is an array, use the first item
+  const vessel = crew.vesselExperience?.[0];
+
+  return {
+    vesselName: vessel?.vesselName || "—",
+    principal: vessel?.principal || "—",
+    expiryDate: vessel?.signedOff || "—", // <-- FIXED
+  };
+};
+
+
   const filteredCrews = useMemo(() => {
     let list = crews.filter((crew) => {
       const q = searchQuery.toLowerCase();
@@ -145,16 +165,21 @@ export default function CrewApplications() {
     let y = 35;
 
     paginatedCrews.forEach((crew, index) => {
+      const vesselInfo = getVesselInfo(crew); // <-- NEW
+
       doc.setFontSize(11);
       doc.text(`${index + 1}. ${crew.fullName}`, 14, y);
       doc.text(`Rank: ${crew.presentRank}`, 14, y + 6);
       doc.text(`Vessel Type: ${crew.vesselType}`, 14, y + 12);
-      doc.text(`Age: ${getAge(crew.dateOfBirth)}`, 14, y + 18);
-      doc.text(`Email: ${crew.emailAddress}`, 14, y + 24);
-      doc.text(`Status: ${crew.status.toUpperCase()}`, 14, y + 30);
-      doc.text(`Remarks: ${crew.remarks || "—"}`, 14, y + 36);
+      doc.text(`Vessel Name: ${vesselInfo.vesselName}`, 14, y + 18);
+      doc.text(`Principal: ${vesselInfo.principal}`, 14, y + 24);
+      doc.text(`Expiry Date: ${vesselInfo.expiryDate}`, 14, y + 30);
+      doc.text(`Age: ${getAge(crew.dateOfBirth)}`, 14, y + 36);
+      doc.text(`Email: ${crew.emailAddress}`, 14, y + 42);
+      doc.text(`Status: ${crew.status.toUpperCase()}`, 14, y + 48);
+      doc.text(`Remarks: ${crew.remarks || "—"}`, 14, y + 54);
 
-      y += 50;
+      y += 60;
       if (y > 270) {
         doc.addPage();
         y = 20;
@@ -246,6 +271,15 @@ export default function CrewApplications() {
                       Vessel Type
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
+                      Vessel Name
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
+                      Principal
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
+                      Expiry Date
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
                       Age
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-semibold text-gray-800">
@@ -264,77 +298,93 @@ export default function CrewApplications() {
                 </thead>
 
                 <tbody className="divide-y bg-white">
-                  {paginatedCrews.map((crew) => (
-                    <tr key={crew.id} className="hover:bg-blue-50">
-                      <td className="px-6 py-4 text-center text-gray-600">
-                        {crew.presentRank}
-                      </td>
-                      <td className="px-6 py-4 text-center font-medium text-gray-800">
-                        {crew.fullName}
-                      </td>
-                      <td className="px-6 py-4 text-center text-gray-600">
-                        {crew.vesselType}
-                      </td>
-                      <td className="px-6 py-4 text-center text-gray-600">
-                        {getAge(crew.dateOfBirth)}
-                      </td>
-                      <td className="px-6 py-4 text-center text-gray-600">
-                        {crew.emailAddress}
-                      </td>
+                  {paginatedCrews.map((crew) => {
+                    const vesselInfo = getVesselInfo(crew); // <-- NEW
 
-                      <td className="px-6 py-4 text-center">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold
-                            ${crew.status === "approved"
-                              ? "bg-green-100 text-green-700"
-                              : crew.status === "proposed"
-                              ? "bg-yellow-100 text-yellow-700"
-                              : crew.status === "pending"
-                              ? "bg-orange-600 text-gray-900"
-                              : crew.status === "fooled"
-                              ? "bg-orange-100 text-orange-700"
-                              : "bg-red-100 text-red-700"}`}
-                        >
-                          {crew.status.toUpperCase()}
-                        </span>
-                      </td>
+                    return (
+                      <tr key={crew.id} className="hover:bg-blue-50">
+                        <td className="px-6 py-4 text-center text-gray-600">
+                          {crew.presentRank}
+                        </td>
+                        <td className="px-6 py-4 text-center font-medium text-gray-800">
+                          {crew.fullName}
+                        </td>
+                        <td className="px-6 py-4 text-center text-gray-600">
+                          {crew.vesselType}
+                        </td>
 
-                      <td className="px-6 py-4 text-center text-gray-600">
-                        {crew.remarks || "No remarks"}
-                      </td>
+                        {/* NEW TABLE DATA */}
+                        <td className="px-6 py-4 text-center text-gray-600">
+                          {vesselInfo.vesselName}
+                        </td>
+                        <td className="px-6 py-4 text-center text-gray-600">
+                          {vesselInfo.principal}
+                        </td>
+                        <td className="px-6 py-4 text-center text-gray-600">
+                          {vesselInfo.expiryDate}
+                        </td>
 
-                      <td className="px-6 py-4">
-                        <div className="flex gap-2 justify-center">
-                          <button
-                            onClick={() => setSelectedCrew(crew)}
-                            className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
-                            title="View Details"
+                        <td className="px-6 py-4 text-center text-gray-600">
+                          {getAge(crew.dateOfBirth)}
+                        </td>
+                        <td className="px-6 py-4 text-center text-gray-600">
+                          {crew.emailAddress}
+                        </td>
+
+                        <td className="px-6 py-4 text-center">
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-semibold
+                              ${crew.status === "approved"
+                                ? "bg-green-100 text-green-700"
+                                : crew.status === "proposed"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : crew.status === "pending"
+                                ? "bg-orange-600 text-gray-900"
+                                : crew.status === "fooled"
+                                ? "bg-orange-100 text-orange-700"
+                                : "bg-red-100 text-red-700"}`}
                           >
-                            <Eye className="w-4 h-4" />
-                          </button>
+                            {crew.status.toUpperCase()}
+                          </span>
+                        </td>
 
-                          <button
-                            onClick={() => handleEdit(crew)}
-                            className="p-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition"
-                            title="Edit"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
+                        <td className="px-6 py-4 text-center text-gray-600">
+                          {crew.remarks || "No remarks"}
+                        </td>
 
-                          <button
-                            onClick={() => {
-                              setDeleteTargetId(crew.id);
-                              setShowDeleteConfirm(true);
-                            }}
-                            className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        <td className="px-6 py-4">
+                          <div className="flex gap-2 justify-center">
+                            <button
+                              onClick={() => setSelectedCrew(crew)}
+                              className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
+                              title="View Details"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              onClick={() => handleEdit(crew)}
+                              className="p-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition"
+                              title="Edit"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setDeleteTargetId(crew.id);
+                                setShowDeleteConfirm(true);
+                              }}
+                              className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
