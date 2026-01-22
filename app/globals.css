@@ -39,6 +39,19 @@
   --sidebar-accent-foreground: #1a3a3a;
   --sidebar-border: #D0E8E5;
   --sidebar-ring: #7AB2B2;
+
+  --theme-green: #10B981;
+  --theme-amber: #F59E0B;
+  --theme-red: #EF4444;
+  --theme-blue: #3B82F6;
+  --theme-purple: #8B5CF6;
+
+  /* Soft backgrounds for cards / badges */
+  --theme-green-soft: #D1FAE5;
+  --theme-amber-soft: #FEF3C7;
+  --theme-red-soft: #FEE2E2;
+  --theme-blue-soft: #DBEAFE;
+  --theme-purple-soft: #EDE9FE;
 }
 
 .dark {
@@ -74,6 +87,17 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+  --theme-green: #34D399;
+  --theme-amber: #FBBF24;
+  --theme-red: #F87171;
+  --theme-blue: #60A5FA;
+  --theme-purple: #A78BFA;
+
+  --theme-green-soft: oklch(0.35 0.05 160);
+  --theme-amber-soft: oklch(0.4 0.08 85);
+  --theme-red-soft: oklch(0.38 0.1 25);
+  --theme-blue-soft: oklch(0.35 0.08 260);
+  --theme-purple-soft: oklch(0.35 0.09 300);
 }
 
 @theme inline {
@@ -115,6 +139,13 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+    /* Dashboard colors */
+  --color-theme-green: var(--theme-green);
+  --color-theme-amber: var(--theme-amber);
+  --color-theme-red: var(--theme-red);
+  --color-theme-blue: var(--theme-blue);
+  --color-theme-purple: var(--theme-purple);
+
 }
 
 @layer base {

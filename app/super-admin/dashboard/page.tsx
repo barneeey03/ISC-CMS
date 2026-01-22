@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { SuperAdminSidebar } from "@/app/components/SuperAdminSidebar";
+import { useMemo, useState } from "react";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
+import { SuperAdminSidebar } from "@/app/components/SuperAdminSidebar";
 import { useAuth } from "@/app/context/AuthContext";
 import { dataStore } from "@/app/lib/dataStore";
 
@@ -11,305 +11,338 @@ import {
   FileCheck,
   XCircle,
   TrendingUp,
-  AlertCircle,
-  Ship,
   Search,
-  RefreshCcw,
+  Download,
 } from "lucide-react";
 
 import {
+  ResponsiveContainer,
   LineChart,
   Line,
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
   Legend,
-  BarChart,
-  Bar,
 } from "recharts";
 
+import { motion } from "framer-motion";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+
+/* ---------------- STATUS COLOR MAP ---------------- */
+
+const STATUS_STYLE: Record<string, { color: string; bg: string }> = {
+  approved: { color: "#10B981", bg: "#10B98122" },
+  pending: { color: "#F59E0B", bg: "#F59E0B22" },
+  disapproved: { color: "#EF4444", bg: "#EF444422" },
+};
+
+const getStatusStyle = (status: string) =>
+  STATUS_STYLE[status] ?? { color: "#64748B", bg: "#CBD5E122" };
+
+/* ---------------- COMPONENT ---------------- */
 
 export default function SuperAdminDashboard() {
   const { email } = useAuth();
+  const crews = dataStore.getAllCrews();
 
-  const [crews, setCrews] = useState(dataStore.getAllCrews());
-
-  // Filters
-  const [statusFilter, setStatusFilter] = useState<"all" | "approved" | "pending" | "disapproved">("all");
-  const [fromDate, setFromDate] = useState<string>("");
-  const [toDate, setToDate] = useState<string>("");
+  /* ---------- FILTER STATE ---------- */
+  const [statusFilter, setStatusFilter] =
+    useState<"all" | "approved" | "pending" | "disapproved">("all");
   const [search, setSearch] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
-  // Real-time update simulation (auto-refresh)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCrews(dataStore.getAllCrews());
-    }, 3000); // refresh every 3 seconds
-    return () => clearInterval(interval);
-  }, []);
+  /* ---------- SORT & PAGINATION ---------- */
+  const [sortKey, setSortKey] = useState("createdAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [page, setPage] = useState(1);
+  const pageSize = 6;
 
+  /* ---------- FILTER LOGIC ---------- */
   const filteredCrews = useMemo(() => {
-    return crews.filter((crew) => {
-      // Status filter
-      if (statusFilter !== "all" && crew.status !== statusFilter) return false;
+    return crews.filter((c) => {
+      if (statusFilter !== "all" && c.status !== statusFilter) return false;
 
-      // Date filter
-      const createdAt = new Date(crew.createdAt).getTime();
-      if (fromDate && createdAt < new Date(fromDate).getTime()) return false;
-      if (toDate && createdAt > new Date(toDate).getTime()) return false;
+      const created = new Date(c.createdAt).getTime();
+      if (fromDate && created < new Date(fromDate).getTime()) return false;
+      if (toDate && created > new Date(toDate).getTime()) return false;
 
-      // Search filter
-      const keyword = search.toLowerCase();
       if (
-        !crew.name.toLowerCase().includes(keyword) &&
-        !crew.rank.toLowerCase().includes(keyword) &&
-        !crew.vesselName.toLowerCase().includes(keyword)
-      ) return false;
+        search &&
+        !`${c.name} ${c.rank} ${c.vesselName}`
+          .toLowerCase()
+          .includes(search.toLowerCase())
+      )
+        return false;
 
       return true;
     });
-  }, [crews, statusFilter, fromDate, toDate, search]);
+  }, [crews, statusFilter, search, fromDate, toDate]);
 
-  const approvedCount = filteredCrews.filter((c) => c.status === "approved").length;
-  const pendingCount = filteredCrews.filter((c) => c.status === "pending").length;
-  const disapprovedCount = filteredCrews.filter((c) => c.status === "disapproved").length;
+  /* ---------- SORT ---------- */
+  const sortedCrews = useMemo(() => {
+    return [...filteredCrews].sort((a: any, b: any) => {
+      const A = a[sortKey];
+      const B = b[sortKey];
+      if (A < B) return sortDir === "asc" ? -1 : 1;
+      if (A > B) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [filteredCrews, sortKey, sortDir]);
 
-  const COLORS = [
-    "var(--theme-blue)",
-    "var(--theme-amber)",
-    "var(--theme-red)",
-    "var(--theme-purple)",
-  ];
+  /* ---------- PAGINATION ---------- */
+  const totalPages = Math.ceil(sortedCrews.length / pageSize);
+  const paginatedCrews = sortedCrews.slice(
+    (page - 1) * pageSize,
+    page * pageSize
+  );
 
-  // Monthly trend
-  const lineData = useMemo(() => {
+  /* ---------- COUNTS ---------- */
+  const total = filteredCrews.length;
+  const pending = filteredCrews.filter((c) => c.status === "pending").length;
+  const approved = filteredCrews.filter((c) => c.status === "approved").length;
+  const disapproved = filteredCrews.filter(
+    (c) => c.status === "disapproved"
+  ).length;
+
+  /* ---------- CHART DATA ---------- */
+  const monthlyData = useMemo(() => {
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const data = months.map((m) => ({ month: m, value: 0 }));
-
-    filteredCrews.forEach((crew) => {
-      const idx = new Date(crew.createdAt).getMonth();
-      data[idx].value += 1;
+    filteredCrews.forEach((c) => {
+      data[new Date(c.createdAt).getMonth()].value++;
     });
-
     return data;
   }, [filteredCrews]);
 
-  // Top Vessels
-  const vesselStats = useMemo(() => {
-    const map: Record<string, number> = {};
-    filteredCrews.forEach((crew) => {
-      const vessel = crew.vesselName || "Unknown";
-      map[vessel] = (map[vessel] || 0) + 1;
+  /* ---------- EXPORT PDF ---------- */
+  const exportPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text("Applicants Report", 14, 14);
+
+    doc.setFontSize(10);
+    doc.text(
+      `Status: ${statusFilter} | ${fromDate || "Any"} → ${toDate || "Any"}`,
+      14,
+      22
+    );
+
+    autoTable(doc, {
+      startY: 28,
+      head: [["Name", "Rank", "Vessel", "Status", "Date"]],
+      body: sortedCrews.map((c) => [
+        c.name,
+        c.rank,
+        c.vesselName,
+        c.status.toUpperCase(),
+        new Date(c.createdAt).toLocaleDateString(),
+      ]),
     });
 
-    return Object.entries(map)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([name, value]) => ({ name, value }));
-  }, [filteredCrews]);
+    doc.save("applicants-report.pdf");
+  };
 
-  // Expiring certificates (fake data for demo)
-  const expiring = useMemo(() => {
-    return filteredCrews
-      .filter((c) => c.certificates?.some((cert) => new Date(cert.validUntil) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)))
-      .slice(0, 5);
-  }, [filteredCrews]);
+  /* ================= RENDER ================= */
 
   return (
     <ProtectedRoute requiredRole="super-admin">
-      <div className="min-h-screen flex dashboard-bg">
-        {/* Sidebar */}
-        <div className="fixed left-0 top-0 h-full z-20">
-          <SuperAdminSidebar />
-        </div>
+      <div className="min-h-screen flex bg-background">
+        <SuperAdminSidebar />
 
-        {/* Main */}
-        <div className="dashboard-main w-full">
-          <div className="bg-[var(--card)] border-b border-[var(--border)] p-6">
-            <h1 className="text-3xl font-extrabold text-[var(--foreground)]">
-              Dashboard
-            </h1>
-            <p className="text-[var(--muted-foreground)] mt-1">
+        <main className="flex-1 ml-65 p-4 md:p-6 space-y-4">
+          {/* HEADER */}
+          <div>
+            <h1 className="text-2xl font-extrabold">Dashboard</h1>
+            <p className="text-sm text-muted-foreground">
               Welcome back, {email}
             </p>
           </div>
 
-          {/* Filters + Search */}
-          <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* FILTERS */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
             <select
-              className="p-3 rounded-lg border border-[var(--border)] bg-[var(--card)]"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
+              className="p-2 rounded border bg-card"
             >
               <option value="all">All Status</option>
-              <option value="approved">Approved</option>
               <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
               <option value="disapproved">Disapproved</option>
             </select>
 
-            <input
-              type="date"
-              className="p-3 rounded-lg border border-[var(--border)] bg-[var(--card)]"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-            />
+            <input type="date" className="p-2 border rounded" onChange={e => setFromDate(e.target.value)} />
+            <input type="date" className="p-2 border rounded" onChange={e => setToDate(e.target.value)} />
 
-            <input
-              type="date"
-              className="p-3 rounded-lg border border-[var(--border)] bg-[var(--card)]"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-            />
-
-            <div className="relative">
+            <div className="relative md:col-span-2">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
               <input
-                type="text"
-                className="w-full p-3 rounded-lg border border-[var(--border)] bg-[var(--card)]"
-                placeholder="Search by name, rank, vessel..."
-                value={search}
+                placeholder="Search crew..."
+                className="pl-9 p-2 w-full border rounded"
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <Search className="absolute right-3 top-3 w-5 h-5 text-[var(--muted-foreground)]" />
             </div>
           </div>
 
-          {/* Stats Cards (Aligned) */}
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatCard title="Total Crew" value={filteredCrews.length} color="var(--theme-blue)" icon={<Users className="w-10 h-10" />} />
-            <StatCard title="Pending" value={pendingCount} color="var(--theme-amber)" icon={<TrendingUp className="w-10 h-10" />} />
-            <StatCard title="Approved" value={approvedCount} color="var(--theme-purple)" icon={<FileCheck className="w-10 h-10" />} />
-            <StatCard title="Disapproved" value={disapprovedCount} color="var(--theme-red)" icon={<XCircle className="w-10 h-10" />} />
+          {/* STAT CARDS */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard title="Total Crew" value={total} icon={<Users />} />
+            <StatCard title="Pending" value={pending} icon={<TrendingUp />} />
+            <StatCard title="Approved" value={approved} icon={<FileCheck />} />
+            <StatCard title="Disapproved" value={disapproved} icon={<XCircle />} />
           </div>
 
-          {/* Analytics Charts */}
-          <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Monthly Trend */}
-            <div className="bg-[var(--card)] rounded-2xl shadow-sm p-6 border border-[var(--border)]">
-              <h2 className="text-xl font-bold text-[var(--foreground)] mb-4">
-                Monthly Applications
-              </h2>
-              <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={lineData}>
-                  <XAxis dataKey="month" stroke="var(--muted-foreground)" />
-                  <YAxis stroke="var(--muted-foreground)" />
+          {/* CHARTS */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <ChartCard title="Monthly Applications">
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart data={monthlyData}>
+                  <XAxis dataKey="month" />
+                  <YAxis />
                   <Tooltip />
-                  <Line type="monotone" dataKey="value" stroke="var(--theme-blue)" strokeWidth={3} />
+                  <Line
+                    dataKey="value"
+                    stroke="#3B82F6"
+                    strokeWidth={3}
+                    animationDuration={500}
+                  />
                 </LineChart>
               </ResponsiveContainer>
-            </div>
+            </ChartCard>
 
-            {/* Status Pie */}
-            <div className="bg-[var(--card)] rounded-2xl shadow-sm p-6 border border-[var(--border)]">
-              <h2 className="text-xl font-bold text-[var(--foreground)] mb-4">
-                Status Distribution
-              </h2>
-              <ResponsiveContainer width="100%" height={250}>
+            <ChartCard title="Status Distribution">
+              <ResponsiveContainer width="100%" height={260}>
                 <PieChart>
                   <Pie
                     data={[
-                      { name: "Approved", value: approvedCount },
-                      { name: "Pending", value: pendingCount },
-                      { name: "Disapproved", value: disapprovedCount },
+                      { name: "Approved", value: approved },
+                      { name: "Pending", value: pending },
+                      { name: "Disapproved", value: disapproved },
                     ]}
                     dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label
+                    outerRadius={90}
+                    animationDuration={500}
                   >
-                    {COLORS.slice(0, 3).map((c, i) => (
-                      <Cell key={i} fill={c} />
-                    ))}
+                    <Cell fill="#10B981" />
+                    <Cell fill="#F59E0B" />
+                    <Cell fill="#EF4444" />
                   </Pie>
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
-            </div>
-
-            {/* Top Vessels */}
-            <div className="bg-[var(--card)] rounded-2xl shadow-sm p-6 border border-[var(--border)]">
-              <h2 className="text-xl font-bold text-[var(--foreground)] mb-4">
-                Top Vessels
-              </h2>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={vesselStats}>
-                  <XAxis dataKey="name" stroke="var(--muted-foreground)" />
-                  <YAxis stroke="var(--muted-foreground)" />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="var(--theme-amber)" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            </ChartCard>
           </div>
 
-          {/* Live Activity + Expiring */}
-          <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-[var(--card)] rounded-2xl shadow-sm p-6 border border-[var(--border)]">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-[var(--foreground)]">
-                  Live Activity Feed
-                </h2>
-                <div className="flex items-center gap-2">
-                  <RefreshCcw className="w-5 h-5 text-[var(--muted-foreground)]" />
-                  <span className="text-xs text-[var(--muted-foreground)]">Auto-updates every 3s</span>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {filteredCrews.slice(0, 5).map((c) => (
-                  <div key={c.id} className="p-3 rounded-lg border border-[var(--border)] bg-[var(--background)]">
-                    <div className="flex justify-between">
-                      <span className="font-bold text-[var(--foreground)]">{c.name}</span>
-                      <span className="text-xs text-[var(--muted-foreground)]">{c.status}</span>
-                    </div>
-                    <div className="text-xs text-[var(--muted-foreground)]">
-                      {c.rank} • {c.vesselName}
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {/* TABLE */}
+          <div className="bg-card rounded-xl border p-4 space-y-3">
+            <div className="flex justify-between">
+              <h2 className="font-bold">All Applicants</h2>
+              <button
+                onClick={exportPDF}
+                className="flex items-center gap-2 px-3 py-1 border rounded"
+              >
+                <Download className="w-4 h-4" /> Export PDF
+              </button>
             </div>
 
-            <div className="bg-[var(--card)] rounded-2xl shadow-sm p-6 border border-[var(--border)]">
-              <h2 className="text-xl font-bold text-[var(--foreground)] mb-4">
-                Certificates Expiring Soon
-              </h2>
-              <div className="space-y-3">
-                {expiring.map((c) => (
-                  <div key={c.id} className="p-3 rounded-lg border border-[var(--border)] bg-[var(--background)]">
-                    <div className="font-bold text-[var(--foreground)]">{c.name}</div>
-                    <div className="text-xs text-[var(--muted-foreground)]">
-                      Expiring soon • {c.certificates[0]?.name}
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <table className="w-full text-sm">
+              <thead className="bg-muted">
+                <tr>
+                  {["name","rank","vesselName","status","createdAt"].map(k => (
+                    <th
+                      key={k}
+                      onClick={() => {
+                        setSortKey(k);
+                        setSortDir(sortDir === "asc" ? "desc" : "asc");
+                      }}
+                      className="p-2 cursor-pointer text-left"
+                    >
+                      {k.toUpperCase()}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+
+              <tbody>
+                {paginatedCrews.map((c) => {
+                  const s = getStatusStyle(c.status);
+                  return (
+                    <tr key={c.id} className="border-b">
+                      <td className="p-2">{c.name}</td>
+                      <td className="p-2">{c.rank}</td>
+                      <td className="p-2">{c.vesselName}</td>
+                      <td className="p-2">
+                        <span
+                          className="px-2 py-1 rounded-full text-xs"
+                          style={{ background: s.bg, color: s.color }}
+                        >
+                          {c.status}
+                        </span>
+                      </td>
+                      <td className="p-2">
+                        {new Date(c.createdAt).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* PAGINATION */}
+            <div className="flex justify-between items-center">
+              <button
+                disabled={page === 1}
+                onClick={() => setPage(p => p - 1)}
+                className="px-3 py-1 border rounded"
+              >
+                Prev
+              </button>
+              <span className="text-xs">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                disabled={page === totalPages}
+                onClick={() => setPage(p => p + 1)}
+                className="px-3 py-1 border rounded"
+              >
+                Next
+              </button>
             </div>
           </div>
-
-        </div>
+        </main>
       </div>
     </ProtectedRoute>
   );
 }
 
+/* ---------------- SMALL COMPONENTS ---------------- */
 
-function StatCard({ title, value, color, icon }: any) {
+function StatCard({ title, value, icon }: any) {
   return (
-    <div className="bg-[var(--card)] rounded-2xl shadow-sm p-6 border border-[var(--border)] hover:shadow-lg transition-shadow">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-[var(--muted-foreground)] text-sm font-semibold">{title}</p>
-          <p className="text-3xl font-extrabold text-[var(--foreground)] mt-2">{value}</p>
-        </div>
-        <div className="p-3 rounded-xl" style={{ background: `${color}20` }}>
-          <div style={{ color: color }}>{icon}</div>
-        </div>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-card border rounded-xl p-3 flex justify-between"
+    >
+      <div>
+        <p className="text-xs text-muted-foreground">{title}</p>
+        <p className="text-2xl font-bold">{value}</p>
       </div>
+      <div className="opacity-60">{icon}</div>
+    </motion.div>
+  );
+}
+
+function ChartCard({ title, children }: any) {
+  return (
+    <div className="bg-card border rounded-xl p-4">
+      <h3 className="font-bold mb-2">{title}</h3>
+      {children}
     </div>
   );
 }
