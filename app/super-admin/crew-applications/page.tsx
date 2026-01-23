@@ -5,7 +5,7 @@ import { SuperAdminSidebar } from "@/app/components/SuperAdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 import { CrewApplicationForm } from "@/app/components/CrewApplicationForm";
 import { CrewDetailsModal } from "@/app/components/CrewDetailsModal";
-import { CrewMember } from "@/app/lib/dataStore";
+import { CrewMember } from "@/app/lib/type";
 
 import { Eye, Edit2, Trash2, Download, Search } from "lucide-react";
 import jsPDF from "jspdf";
