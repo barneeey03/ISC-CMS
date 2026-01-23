@@ -10,16 +10,15 @@ export function CrewDetailsModal({
   onApprove,
   onDisapprove,
   onProposed,
-  onFooled,          // <-- ADD THIS
+  onFooled,
 }: {
   crew: CrewMember;
   onClose: () => void;
   onApprove: (id: string) => void;
   onDisapprove: (id: string, reconsider?: boolean) => void;
   onProposed: (id: string) => void;
-  onFooled: (id: string) => void;   // <-- ADD THIS
+  onFooled: (id: string) => void;
 }) {
-
   const [openSection, setOpenSection] = useState<string | null>("basic");
   const [showReconsider, setShowReconsider] = useState(false);
 
@@ -207,6 +206,7 @@ export function CrewDetailsModal({
             )}
           </Section>
 
+          {/* ====== Certificates TABLE ====== */}
           <Section
             title="Certificates"
             isOpen={openSection === "certificates"}
@@ -215,22 +215,36 @@ export function CrewDetailsModal({
             {crew.certificates.length === 0 ? (
               <p className="text-sm text-gray-600">No certificates added.</p>
             ) : (
-              <div className="space-y-2">
-                {crew.certificates.map((c) => (
-                  <div
-                    key={c.id}
-                    className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 border rounded-lg"
-                  >
-                    <Detail label="Name" value={c.name} />
-                    <Detail label="No." value={c.number} />
-                    <Detail label="Issued" value={c.dateIssued} />
-                    <Detail label="Valid Until" value={c.validUntil} />
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full table-auto border-collapse">
+                  <thead>
+                    <tr className="bg-[#F3F6F9]">
+                      <th className="border px-2 py-2 text-xs">Name of Certificate</th>
+                      <th className="border px-2 py-2 text-xs">Certificate No.</th>
+                      <th className="border px-2 py-2 text-xs">Date Issued</th>
+                      <th className="border px-2 py-2 text-xs">Valid Until</th>
+                      <th className="border px-2 py-2 text-xs">Place Issued</th>
+                      <th className="border px-2 py-2 text-xs">Training Center</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {crew.certificates.map((c) => (
+                      <tr key={c.id}>
+                        <td className="border px-2 py-2 text-xs">{c.name}</td>
+                        <td className="border px-2 py-2 text-xs">{c.number}</td>
+                        <td className="border px-2 py-2 text-xs">{c.dateIssued}</td>
+                        <td className="border px-2 py-2 text-xs">{c.validUntil}</td>
+                        <td className="border px-2 py-2 text-xs">{c.placeIssued}</td>
+                        <td className="border px-2 py-2 text-xs">{c.trainingCenter}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </Section>
 
+          {/* ====== Vessel Experience TABLE ====== */}
           <Section
             title="Vessel Experience"
             isOpen={openSection === "vessel"}
@@ -239,27 +253,43 @@ export function CrewDetailsModal({
             {crew.vesselExperience.length === 0 ? (
               <p className="text-sm text-gray-600">No vessel experience added.</p>
             ) : (
-              <div className="space-y-2">
-                {crew.vesselExperience.map((v) => (
-                  <div
-                    key={v.id}
-                    className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 border rounded-lg"
-                  >
-                    <Detail label="Vessel Name" value={v.vesselName} />
-                    <Detail label="Rank" value={v.rank} />
-                    <Detail label="Vessel Type" value={v.vesselType} />
-                    <Detail label="Manning Company" value={v.manningCompany} />
-                    <Detail label="Principal" value={v.principal} />
-                    <Detail label="Flag" value={v.flag} />
-                    <Detail label="GRT" value={v.grt} />
-                    <Detail label="Engine Maker" value={v.engineMaker} />
-                    <Detail label="Trading" value={v.trading} />
-                    <Detail label="Route" value={v.route} />
-                    <Detail label="Signed On" value={v.signedOn} />
-                    <Detail label="Signed Off" value={v.signedOff} />
-                    <Detail label="Cause of Discharge" value={v.causeOfDischarge} />
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full table-auto border-collapse">
+                  <thead>
+                    <tr className="bg-[#F3F6F9]">
+                      <th className="border px-2 py-2 text-xs">Manning Company</th>
+                      <th className="border px-2 py-2 text-xs">Principal</th>
+                      <th className="border px-2 py-2 text-xs">Rank</th>
+                      <th className="border px-2 py-2 text-xs">Vessel Name</th>
+                      <th className="border px-2 py-2 text-xs">Flag</th>
+                      <th className="border px-2 py-2 text-xs">Vessel Type</th>
+                      <th className="border px-2 py-2 text-xs">GRT</th>
+                      <th className="border px-2 py-2 text-xs">Main Engine Maker hp/kW</th>
+                      <th className="border px-2 py-2 text-xs">Trading Route</th>
+                      <th className="border px-2 py-2 text-xs">Signed On</th>
+                      <th className="border px-2 py-2 text-xs">Signed Off</th>
+                      <th className="border px-2 py-2 text-xs">Cause of Discharge</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {crew.vesselExperience.map((v) => (
+                      <tr key={v.id}>
+                        <td className="border px-2 py-2 text-xs">{v.manningCompany}</td>
+                        <td className="border px-2 py-2 text-xs">{v.principal}</td>
+                        <td className="border px-2 py-2 text-xs">{v.rank}</td>
+                        <td className="border px-2 py-2 text-xs">{v.vesselName}</td>
+                        <td className="border px-2 py-2 text-xs">{v.flag}</td>
+                        <td className="border px-2 py-2 text-xs">{v.vesselType}</td>
+                        <td className="border px-2 py-2 text-xs">{v.grt}</td>
+                        <td className="border px-2 py-2 text-xs">{v.engineMaker}</td>
+                        <td className="border px-2 py-2 text-xs">{v.route}</td>
+                        <td className="border px-2 py-2 text-xs">{v.signedOn}</td>
+                        <td className="border px-2 py-2 text-xs">{v.signedOff}</td>
+                        <td className="border px-2 py-2 text-xs">{v.causeOfDischarge}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </Section>

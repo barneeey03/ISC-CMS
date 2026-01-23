@@ -4,6 +4,8 @@ export type Certificate = {
   number: string;
   dateIssued: string;
   validUntil: string;
+  placeIssued: string;      
+  trainingCenter: string;
 };
 
 export type VesselExperience = {

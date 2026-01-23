@@ -736,64 +736,96 @@ export function CrewApplicationForm({
           </section>
 
           {/* CERTIFICATES */}
-          <section className="border border-[#E0E8F0] rounded-xl p-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-[#0080C0] mb-5">
-                Certificates
-              </h3>
+          <section className="border rounded-xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-[#0080C0]">Certificates</h3>
               <button
                 type="button"
                 onClick={addCertificate}
                 className="flex items-center gap-2 bg-[#0080C0] text-white px-4 py-2 rounded-lg"
               >
-                <Plus className="w-4 h-4" /> Add Certificate
+                <Plus size={16} /> Add Certificate
               </button>
             </div>
 
             <div className="space-y-3">
-              {formData.certificates.map((cert: any) => (
-                <div key={cert.id} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+                {formData.certificates.map((cert: Certificate) => (
+                <div
+                  key={cert.id}
+                  className="grid grid-cols-1 md:grid-cols-7 gap-3 items-end"
+                >
                   <select
-                    value={cert.name}
-                    onChange={(e) => updateCertificate(cert.id, "name", e.target.value)}
-                    className={inputStyle}
+                  value={cert.name}
+                  onChange={(e) =>
+                    updateCertificate(cert.id, "name", e.target.value)
+                  }
+                  className={inputStyle}
                   >
-                    <option value="">Select Certificate</option>
-                    {CERTIFICATES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
+                  <option value="">Certificate</option>
+                  {CERTIFICATES.map((c) => (
+                    <option key={c} value={c}>
+                    {c}
+                    </option>
+                  ))}
                   </select>
+
                   <input
-                    value={cert.number}
-                    onChange={(e) => updateCertificate(cert.id, "number", e.target.value)}
-                    className={inputStyle}
-                    placeholder="Certificate No."
+                  className={inputStyle}
+                  placeholder="Certificate No."
+                  value={cert.number}
+                  onChange={(e) =>
+                    updateCertificate(cert.id, "number", e.target.value)
+                  }
                   />
+
                   <input
-                    type="date"
-                    value={cert.dateIssued}
-                    onChange={(e) => updateCertificate(cert.id, "dateIssued", e.target.value)}
-                    className={inputStyle}
+                  className={inputStyle}
+                  placeholder="Place Issued"
+                  value={cert.placeIssued}
+                  onChange={(e) =>
+                    updateCertificate(cert.id, "placeIssued", e.target.value)
+                  }
                   />
+
                   <input
-                    type="date"
-                    value={cert.validUntil}
-                    onChange={(e) => updateCertificate(cert.id, "validUntil", e.target.value)}
-                    className={inputStyle}
+                  className={inputStyle}
+                  placeholder="Training Center"
+                  value={cert.trainingCenter}
+                  onChange={(e) =>
+                    updateCertificate(cert.id, "trainingCenter", e.target.value)
+                  }
                   />
+
+                  <input
+                  type="date"
+                  className={inputStyle}
+                  value={cert.dateIssued}
+                  onChange={(e) =>
+                    updateCertificate(cert.id, "dateIssued", e.target.value)
+                  }
+                  />
+
+                  <input
+                  type="date"
+                  className={inputStyle}
+                  value={cert.validUntil}
+                  onChange={(e) =>
+                    updateCertificate(cert.id, "validUntil", e.target.value)
+                  }
+                  />
+
                   <button
-                    type="button"
-                    onClick={() => removeCertificate(cert.id)}
-                    className="flex items-center justify-center border border-[#D0E0F0] rounded-lg p-2 hover:bg-[#F9FBFD]"
+                  type="button"
+                  onClick={() => removeCertificate(cert.id)}
+                  className="border rounded-lg p-2"
                   >
-                    <Trash2 className="w-4 h-4 text-[#FF0000]" />
+                  <Trash2 className="text-red-500" size={16} />
                   </button>
                 </div>
-              ))}
+                ))}
             </div>
           </section>
+
 
           {/* VESSEL EXPERIENCE */}
           <section className="border border-[#E0E8F0] rounded-xl p-6">
