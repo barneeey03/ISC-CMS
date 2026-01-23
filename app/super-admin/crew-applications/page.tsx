@@ -35,6 +35,11 @@ export default function SuperAdminCrewApplications() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<CrewStatus | "all">("all");
 
+  // Highlight dropdown
+  const [highlightFilter, setHighlightFilter] = useState<
+    "all" | "highlighted"
+  >("all");
+
   const [page, setPage] = useState(1);
   const perPage = 8;
 
@@ -57,7 +62,7 @@ export default function SuperAdminCrewApplications() {
 
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery, statusFilter, highlightFilter]);
 
   /* ============================
      ACTION HANDLERS
@@ -65,9 +70,7 @@ export default function SuperAdminCrewApplications() {
   const handleApprove = async (id: string) => {
     await updateCrewInFirestore(id, { status: "approved" });
     await updateCrewDatabaseInFirestore(id, { status: "approved" });
-
     setSelectedCrew(null);
-    setStatusFilter("all");
   };
 
   const handleDisapprove = async (id: string, reconsider?: boolean) => {
@@ -77,7 +80,6 @@ export default function SuperAdminCrewApplications() {
     await updateCrewDatabaseInFirestore(id, payload);
 
     setSelectedCrew(null);
-    setStatusFilter("all");
   };
 
   const handleProposed = async (id: string) => {
@@ -85,7 +87,6 @@ export default function SuperAdminCrewApplications() {
     await updateCrewDatabaseInFirestore(id, { status: "proposed" });
 
     setSelectedCrew(null);
-    setStatusFilter("all");
   };
 
   const handleFooled = async (id: string) => {
@@ -93,7 +94,6 @@ export default function SuperAdminCrewApplications() {
     await updateCrewDatabaseInFirestore(id, { status: "fooled" });
 
     setSelectedCrew(null);
-    setStatusFilter("all");
   };
 
   const confirmDelete = async () => {
@@ -123,8 +123,20 @@ export default function SuperAdminCrewApplications() {
       vesselType: lastVessel?.vesselType || crew.vesselType || "—",
       vesselName: lastVessel?.vesselName || "—",
       principal: lastVessel?.principal || "—",
+      signedOn: lastVessel?.signedOn || "—",
       signedOff: lastVessel?.signedOff || "—",
     };
+  };
+
+  const calculateDaysOnboard = (crew: CrewMember) => {
+    const last = crew.vesselExperience?.[0];
+    if (!last?.signedOn) return null;
+
+    const start = new Date(last.signedOn).getTime();
+    const end = last.signedOff ? new Date(last.signedOff).getTime() : Date.now();
+
+    const diff = Math.abs(end - start);
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
 
   /* ============================
@@ -144,8 +156,15 @@ export default function SuperAdminCrewApplications() {
       list = list.filter((c) => c.status === statusFilter);
     }
 
+    if (highlightFilter === "highlighted") {
+      list = list.filter((crew) => {
+        const days = calculateDaysOnboard(crew);
+        return days !== null && days < 70;
+      });
+    }
+
     return list;
-  }, [crews, searchQuery, statusFilter]);
+  }, [crews, searchQuery, statusFilter, highlightFilter]);
 
   const totalPages = Math.ceil(filteredCrews.length / perPage);
   const paginatedCrews = filteredCrews.slice(
@@ -165,6 +184,8 @@ export default function SuperAdminCrewApplications() {
 
     paginatedCrews.forEach((crew, index) => {
       const vessel = getVesselInfo(crew);
+      const days = calculateDaysOnboard(crew);
+      const isHighlighted = days !== null && days < 70;
 
       doc.setFontSize(11);
       doc.text(`${index + 1}. ${crew.fullName}`, 14, y);
@@ -172,19 +193,26 @@ export default function SuperAdminCrewApplications() {
       doc.text(`Vessel Type: ${vessel.vesselType}`, 14, y + 12);
       doc.text(`Vessel Name: ${vessel.vesselName}`, 14, y + 18);
       doc.text(`Principal: ${vessel.principal}`, 14, y + 24);
-      doc.text(`Signed Off: ${vessel.signedOff}`, 14, y + 30);
-      doc.text(`Age: ${getAge(crew.dateOfBirth)}`, 14, y + 36);
-      doc.text(`Email: ${crew.emailAddress}`, 14, y + 42);
-      doc.text(
-        `Status: ${
-          crew.status === "assigned" ? "ACTIVE" : crew.status.toUpperCase()
-        }`,
-        14,
-        y + 48
-      );
-      doc.text(`Remarks: ${crew.remarks || "—"}`, 14, y + 54);
+      doc.text(`Signed On: ${vessel.signedOn}`, 14, y + 30);
+      doc.text(`Signed Off: ${vessel.signedOff}`, 14, y + 36);
+      doc.text(`Days Onboard: ${days ?? "—"}`, 14, y + 42);
 
-      y += 60;
+      doc.text(`Age: ${getAge(crew.dateOfBirth)}`, 14, y + 48);
+      doc.text(`Email: ${crew.emailAddress}`, 14, y + 54);
+      doc.text(
+        `Status: ${crew.status === "assigned" ? "ACTIVE" : crew.status.toUpperCase()}`,
+        14,
+        y + 60
+      );
+      doc.text(`Remarks: ${crew.remarks || "—"}`, 14, y + 66);
+
+      if (isHighlighted) {
+        doc.setTextColor(255, 165, 0);
+        doc.text("⚠️ <70 days onboard", 150, y + 6);
+        doc.setTextColor(0, 0, 0);
+      }
+
+      y += 78;
       if (y > 270) {
         doc.addPage();
         y = 20;
@@ -202,11 +230,11 @@ export default function SuperAdminCrewApplications() {
       <div className="flex">
         <SuperAdminSidebar />
 
-        <div className="flex-1 min-h-screen lg:ml-64 bg-gray-50">
+        <div className="flex-1 min-h-screen lg:ml-64 bg-linear-to-b from-[#F4F9FF] to-[#FFFFFF]">
           {/* HEADER */}
           <div className="fixed top-0 left-0 right-0 z-20 lg:ml-64 bg-white border-b shadow-sm">
             <div className="flex justify-between items-center px-6 py-4">
-              <h1 className="text-xl font-semibold tracking-tight">
+              <h1 className="text-xl font-semibold tracking-tight text-[#002060]">
                 Crew Applications
               </h1>
             </div>
@@ -215,7 +243,7 @@ export default function SuperAdminCrewApplications() {
           {/* CONTENT */}
           <div className="pt-24 px-6 pb-10">
             {/* CONTROLS */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
               <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg shadow-sm border">
                 <Search className="w-4 h-4 text-gray-400" />
                 <input
@@ -245,10 +273,28 @@ export default function SuperAdminCrewApplications() {
                 </select>
               </div>
 
-              <div className="flex items-center justify-end gap-2 md:col-span-2">
+              {/* NEW: HIGHLIGHT DROPDOWN */}
+              <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg shadow-sm border">
+                <select
+                  value={highlightFilter}
+                  onChange={(e) =>
+                    setHighlightFilter(e.target.value as "all" | "highlighted")
+                  }
+                  className="w-full outline-none text-sm text-gray-700"
+                >
+                  <option value="all">All Crew</option>
+                  <option value="highlighted">Highlight {"<70 days"}</option>
+                </select>
+              </div>
+
+              {/* EMPTY SPACE */}
+              <div className="hidden md:block" />
+
+              {/* EXPORT BUTTON (aligned right) */}
+              <div className="flex justify-end">
                 <button
                   onClick={exportPDF}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white rounded-lg shadow-sm hover:bg-blue-600 transition"
+                  className="flex items-center gap-2 px-4 py-2 bg-[#005B96] text-white rounded-lg shadow-sm hover:bg-blue-800 transition"
                 >
                   <Download className="w-4 h-4" />
                   Export PDF
@@ -288,9 +334,18 @@ export default function SuperAdminCrewApplications() {
                   <tbody>
                     {paginatedCrews.map((crew) => {
                       const vessel = getVesselInfo(crew);
+                      const days = calculateDaysOnboard(crew);
+                      const isHighlighted = days !== null && days < 70;
 
                       return (
-                        <tr key={crew.id} className="hover:bg-blue-50">
+                        <tr
+                          key={crew.id}
+                          className={`hover:bg-blue-50 ${
+                            isHighlighted
+                              ? "bg-red-100 border-l-4 border-red-600"
+                              : ""
+                          }`}
+                        >
                           <td className="px-3 py-2 text-center">
                             {crew.presentRank}
                           </td>

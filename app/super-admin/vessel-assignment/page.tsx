@@ -4,7 +4,18 @@ import React, { useEffect, useMemo, useState } from "react";
 import { SuperAdminSidebar } from "@/app/components/SuperAdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 import type { CrewMember } from "@/app/lib/dataStore";
-import { Search, Ship, X, Edit2, Trash2 } from "lucide-react";
+import {
+  Search,
+  Ship,
+  X,
+  Edit2,
+  Trash2,
+  Users,
+  Anchor,
+  Clock,
+  Calendar,
+  Download,
+} from "lucide-react";
 
 import {
   updateCrewInFirestore,
@@ -23,6 +34,9 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+
 type VesselAssignment = {
   id?: string;
   crewId: string;
@@ -31,6 +45,8 @@ type VesselAssignment = {
   vesselType: string;
   principal: string;
   assignedDate: string;
+  signedOn: string;
+  signedOff: string | null;
 };
 
 export default function VesselAssignment() {
@@ -41,29 +57,57 @@ export default function VesselAssignment() {
     vesselName: "",
     vesselType: "",
     principal: "",
+    signedOn: new Date().toISOString().split("T")[0],
+    signedOff: "",
   });
 
-  const [vesselAssignments, setVesselAssignments] = useState<VesselAssignment[]>(
-    []
-  );
-
+  const [vesselAssignments, setVesselAssignments] =
+    useState<VesselAssignment[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editAssignment, setEditAssignment] = useState<VesselAssignment | null>(
     null
   );
 
-  // SEARCH
+  // SEARCH & FILTERS
   const [crewSearch, setCrewSearch] = useState("");
+  const [assignmentSearch, setAssignmentSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "active" | "completed"
+  >("all");
+  const [vesselTypeFilter, setVesselTypeFilter] = useState<string>("all");
+
+  // HIGHLIGHT FILTER
+  const [showHighlightOnly, setShowHighlightOnly] = useState(false);
 
   // PAGINATION
   const [page, setPage] = useState(1);
   const perPage = 6;
 
-  // ===== Helper: Status Label =====
-  const getStatusLabel = (status: string | undefined) => {
-    if (!status) return "—";
-    if (status === "assigned") return "Active";
-    return status.charAt(0).toUpperCase() + status.slice(1);
+  // ===== Calculate Days Onboard =====
+  const calculateDaysOnboard = (signedOn: string, signedOff: string | null) => {
+    const startDate = new Date(signedOn);
+    const endDate = signedOff ? new Date(signedOff) : new Date();
+    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  // ===== Expiring contract =====
+  const isExpiring = (signedOn: string, signedOff: string | null) => {
+    const days = calculateDaysOnboard(signedOn, signedOff);
+
+    if (!signedOff && days >= 350) return true;
+
+    if (signedOff) {
+      const endDate = new Date(signedOff);
+      const today = new Date();
+      const diff = Math.ceil(
+        (endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      return diff <= 14;
+    }
+
+    return false;
   };
 
   // ===== Fetch crews =====
@@ -104,6 +148,33 @@ export default function VesselAssignment() {
     return () => unsubscribe();
   }, []);
 
+  // ===== Statistics =====
+  const statistics = useMemo(() => {
+    const activeCrews = vesselAssignments.filter((a) => !a.signedOff).length;
+    const completedAssignments = vesselAssignments.filter((a) => a.signedOff)
+      .length;
+    const uniqueVessels = new Set(
+      vesselAssignments.map((a) => a.vesselName)
+    ).size;
+
+    const completedDays = vesselAssignments
+      .filter((a) => a.signedOff)
+      .map((a) => calculateDaysOnboard(a.signedOn, a.signedOff));
+
+    const avgDaysOnboard =
+      completedDays.length > 0
+        ? Math.round(completedDays.reduce((a, b) => a + b, 0) / completedDays.length)
+        : 0;
+
+    return {
+      activeCrews,
+      completedAssignments,
+      uniqueVessels,
+      avgDaysOnboard,
+      totalAssignments: vesselAssignments.length,
+    };
+  }, [vesselAssignments]);
+
   // ===== Filter crews =====
   const filteredCrews = useMemo(() => {
     const filtered = crews.filter(
@@ -125,33 +196,75 @@ export default function VesselAssignment() {
     });
   }, [crews, crewSearch]);
 
-  // ===== pagination =====
-  const totalPages = Math.ceil(vesselAssignments.length / perPage);
-  const paginatedAssignments = vesselAssignments.slice(
+  // ===== Filter assignments =====
+  const filteredAssignments = useMemo(() => {
+    let filtered = vesselAssignments;
+
+    if (statusFilter === "active") filtered = filtered.filter((a) => !a.signedOff);
+    if (statusFilter === "completed")
+      filtered = filtered.filter((a) => a.signedOff);
+
+    if (vesselTypeFilter !== "all")
+      filtered = filtered.filter((a) => a.vesselType === vesselTypeFilter);
+
+    if (assignmentSearch.trim()) {
+      const q = assignmentSearch.toLowerCase();
+      filtered = filtered.filter(
+        (a) =>
+          a.crewName.toLowerCase().includes(q) ||
+          a.vesselName.toLowerCase().includes(q) ||
+          a.principal.toLowerCase().includes(q)
+      );
+    }
+
+    if (showHighlightOnly) {
+      filtered = filtered.filter(
+        (a) => calculateDaysOnboard(a.signedOn, a.signedOff) < 70
+      );
+    }
+
+    return filtered;
+  }, [
+    vesselAssignments,
+    statusFilter,
+    vesselTypeFilter,
+    assignmentSearch,
+    showHighlightOnly,
+  ]);
+
+  const vesselTypes = useMemo(() => {
+    return Array.from(new Set(vesselAssignments.map((a) => a.vesselType))).sort();
+  }, [vesselAssignments]);
+
+  const totalPages = Math.ceil(filteredAssignments.length / perPage);
+  const paginatedAssignments = filteredAssignments.slice(
     (page - 1) * perPage,
     page * perPage
   );
 
-  // ===== Current assignment info =====
   const getCrewVesselInfo = (crew: CrewMember) => {
     const vessel = crew.vesselExperience?.[0];
     return {
       vesselName: vessel?.vesselName || "—",
       principal: vessel?.principal || "—",
       vesselType: crew.vesselType || "—",
+      signedOn: vessel?.signedOn || "—",
+      signedOff: vessel?.signedOff || "—",
     };
   };
 
-  // ===== When crew selected -> autofill current data =====
   const handleCrewSelect = (id: string) => {
     const crew = crews.find((c) => c.id === id) || null;
     setSelectedCrew(crew);
 
     if (crew) {
+      const vessel = crew.vesselExperience?.[0];
       setTransferData({
         vesselName: crew.vesselName || "",
         vesselType: crew.vesselType || "",
         principal: crew.principal || "",
+        signedOn: vessel?.signedOn || new Date().toISOString().split("T")[0],
+        signedOff: vessel?.signedOff || "",
       });
     }
   };
@@ -161,10 +274,7 @@ export default function VesselAssignment() {
     e.preventDefault();
     if (!selectedCrew) return;
 
-    // STATUS VALIDATION
-    if (
-      !["approved", "proposed", "fooled"].includes(selectedCrew.status || "")
-    ) {
+    if (!["approved", "proposed", "fooled"].includes(selectedCrew.status || "")) {
       alert("Only approved/proposed/fooled crews can be assigned.");
       return;
     }
@@ -174,22 +284,27 @@ export default function VesselAssignment() {
         vesselName: transferData.vesselName,
         vesselType: transferData.vesselType,
         principal: transferData.principal,
-        signedOn: new Date().toISOString().split("T")[0],
-        signedOff: null,
+        signedOn: transferData.signedOn,
+        signedOff: transferData.signedOff || null,
       },
     ];
 
     await updateCrewInFirestore(selectedCrew.id!, {
       vesselExperience,
+      vesselName: transferData.vesselName,
+      vesselType: transferData.vesselType,
+      principal: transferData.principal,
       status: "assigned",
     });
 
     await updateCrewDatabaseInFirestore(selectedCrew.id!, {
       vesselExperience,
+      vesselName: transferData.vesselName,
+      vesselType: transferData.vesselType,
+      principal: transferData.principal,
       status: "assigned",
     });
 
-    // Save assignment to Firestore
     await addDoc(collection(db, "vesselAssignments"), {
       crewId: selectedCrew.id,
       crewName: selectedCrew.fullName,
@@ -197,10 +312,20 @@ export default function VesselAssignment() {
       vesselType: transferData.vesselType,
       principal: transferData.principal,
       assignedDate: new Date().toISOString().split("T")[0],
+      signedOn: transferData.signedOn,
+      signedOff: transferData.signedOff || null,
     });
 
+    alert("Crew successfully assigned to vessel!");
+
     setSelectedCrew(null);
-    setTransferData({ vesselName: "", vesselType: "", principal: "" });
+    setTransferData({
+      vesselName: "",
+      vesselType: "",
+      principal: "",
+      signedOn: new Date().toISOString().split("T")[0],
+      signedOff: "",
+    });
     setCrewSearch("");
     setShowModal(false);
   };
@@ -212,10 +337,8 @@ export default function VesselAssignment() {
     );
     if (!confirmUnassign) return;
 
-    // Delete assignment document
     await deleteDoc(doc(db, "vesselAssignments", assignmentId));
 
-    // Clear crew vessel data
     await updateCrewInFirestore(crewId, {
       vesselExperience: [],
       vesselName: "",
@@ -240,14 +363,14 @@ export default function VesselAssignment() {
     setEditAssignment(assignment);
     setShowModal(true);
 
-    // Load existing data
     setTransferData({
       vesselName: assignment.vesselName,
       vesselType: assignment.vesselType,
       principal: assignment.principal,
+      signedOn: assignment.signedOn,
+      signedOff: assignment.signedOff || "",
     });
 
-    // Select the crew
     const crew = crews.find((c) => c.id === assignment.crewId) || null;
     setSelectedCrew(crew);
   };
@@ -261,34 +384,29 @@ export default function VesselAssignment() {
       vesselName: transferData.vesselName,
       vesselType: transferData.vesselType,
       principal: transferData.principal,
+      signedOn: transferData.signedOn,
+      signedOff: transferData.signedOff || null,
     });
 
-    // Update crew document
+    const vesselExperience = [
+      {
+        vesselName: transferData.vesselName,
+        vesselType: transferData.vesselType,
+        principal: transferData.principal,
+        signedOn: transferData.signedOn,
+        signedOff: transferData.signedOff || null,
+      },
+    ];
+
     await updateCrewInFirestore(selectedCrew.id!, {
-      vesselExperience: [
-        {
-          vesselName: transferData.vesselName,
-          vesselType: transferData.vesselType,
-          principal: transferData.principal,
-          signedOn: editAssignment.assignedDate,
-          signedOff: null,
-        },
-      ],
+      vesselExperience,
       vesselName: transferData.vesselName,
       vesselType: transferData.vesselType,
       principal: transferData.principal,
     });
 
     await updateCrewDatabaseInFirestore(selectedCrew.id!, {
-      vesselExperience: [
-        {
-          vesselName: transferData.vesselName,
-          vesselType: transferData.vesselType,
-          principal: transferData.principal,
-          signedOn: editAssignment.assignedDate,
-          signedOff: null,
-        },
-      ],
+      vesselExperience,
       vesselName: transferData.vesselName,
       vesselType: transferData.vesselType,
       principal: transferData.principal,
@@ -296,28 +414,149 @@ export default function VesselAssignment() {
 
     setEditAssignment(null);
     setShowModal(false);
-    alert("Assignment updated!");
+    alert("Assignment updated successfully!");
+  };
+
+  // ===== EXPORT TO PDF =====
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    doc.text("Vessel Assignments Report", 14, 20);
+
+    const headers = [
+      [
+        "Crew Name",
+        "Vessel Name",
+        "Vessel Type",
+        "Principal",
+        "Signed On",
+        "Signed Off",
+        "Days Onboard",
+        "Status",
+      ],
+    ];
+
+    const rows = filteredAssignments.map((a) => {
+      const days = calculateDaysOnboard(a.signedOn, a.signedOff);
+      const status = a.signedOff ? "Completed" : "Active";
+      return [
+        a.crewName,
+        a.vesselName,
+        a.vesselType,
+        a.principal,
+        a.signedOn,
+        a.signedOff || "Still onboard",
+        days,
+        status,
+      ];
+    });
+
+    (doc as any).autoTable({
+      head: headers,
+      body: rows,
+      startY: 30,
+      theme: "striped",
+    });
+
+    doc.save(`vessel-assignments-${new Date().toISOString().split("T")[0]}.pdf`);
   };
 
   return (
     <ProtectedRoute requiredRole="super-admin">
-      <div className="flex min-h-screen bg-linear-to-b from-[#F4F9FF] to-[#FFFFFF]">
+      <div className="flex min-h-screen bg-gradient-to-b from-[#EAF4FF] to-[#FFFFFF]">
         <SuperAdminSidebar />
 
         <div className="flex-1 min-h-screen lg:ml-64 p-6">
-          <div className="bg-white border-b border-[#E0E8F0] p-6 rounded-lg shadow-sm">
-            <h1 className="text-3xl font-extrabold text-[#002060]">
+          {/* Header */}
+          <div className="bg-white border border-[#D6E6FF] p-6 rounded-lg shadow-sm mb-6">
+            <h1 className="text-3xl font-extrabold text-[#003366]">
               Vessel Assignment
             </h1>
             <p className="text-[#6B7A92] mt-1">
-              Assign crew to vessel with ease
+              Manage crew assignments and track vessel deployments
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="bg-gradient-to-br from-[#0B6FA4] to-[#0B9DD6] text-white rounded-lg shadow-md p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-100 text-sm font-medium">
+                    Active Crews
+                  </p>
+                  <h3 className="text-3xl font-bold mt-1">
+                    {statistics.activeCrews}
+                  </h3>
+                  <p className="text-blue-100 text-xs mt-1">
+                    Currently onboard
+                  </p>
+                </div>
+                <div className="bg-white/20 p-3 rounded-full">
+                  <Users className="w-8 h-8" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-[#007A5C] to-[#00B18A] text-white rounded-lg shadow-md p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-100 text-sm font-medium">
+                    Unique Vessels
+                  </p>
+                  <h3 className="text-3xl font-bold mt-1">
+                    {statistics.uniqueVessels}
+                  </h3>
+                  <p className="text-green-100 text-xs mt-1">In fleet</p>
+                </div>
+                <div className="bg-white/20 p-3 rounded-full">
+                  <Anchor className="w-8 h-8" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-[#5A2D7C] to-[#9B4DFF] text-white rounded-lg shadow-md p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-100 text-sm font-medium">
+                    Completed
+                  </p>
+                  <h3 className="text-3xl font-bold mt-1">
+                    {statistics.completedAssignments}
+                  </h3>
+                  <p className="text-purple-100 text-xs mt-1">
+                    Assignments
+                  </p>
+                </div>
+                <div className="bg-white/20 p-3 rounded-full">
+                  <Calendar className="w-8 h-8" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-[#FF7A00] to-[#FFB347] text-white rounded-lg shadow-md p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-orange-100 text-sm font-medium">
+                    Avg. Days Onboard
+                  </p>
+                  <h3 className="text-3xl font-bold mt-1">
+                    {statistics.avgDaysOnboard}
+                  </h3>
+                  <p className="text-orange-100 text-xs mt-1">
+                    For completed assignments
+                  </p>
+                </div>
+                <div className="bg-white/20 p-3 rounded-full">
+                  <Clock className="w-8 h-8" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* SELECT CREW */}
             <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-bold text-[#002060] mb-4">
+              <h2 className="text-xl font-bold text-[#003366] mb-4">
                 Select Crew
               </h2>
 
@@ -330,7 +569,7 @@ export default function VesselAssignment() {
                   value={crewSearch}
                   onChange={(e) => setCrewSearch(e.target.value)}
                   placeholder="Search crew by name, email, or contact..."
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0B6FA4]"
                 />
               </div>
 
@@ -348,7 +587,7 @@ export default function VesselAssignment() {
               </select>
 
               <button
-                className="w-full bg-[#0080C0] text-white py-2 rounded-lg mt-4 hover:bg-blue-700 transition"
+                className="w-full bg-[#0B6FA4] text-white py-2 rounded-lg mt-4 hover:bg-[#085A8A] transition disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => setShowModal(true)}
                 disabled={!selectedCrew}
               >
@@ -356,7 +595,7 @@ export default function VesselAssignment() {
               </button>
 
               <div className="mt-6">
-                <h3 className="text-sm font-semibold text-[#002060]">
+                <h3 className="text-sm font-semibold text-[#003366] mb-3">
                   Current Assignment Details
                 </h3>
 
@@ -365,7 +604,7 @@ export default function VesselAssignment() {
                     (() => {
                       const info = getCrewVesselInfo(selectedCrew);
                       return (
-                        <>
+                        <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                           <div className="text-sm text-gray-700">
                             <span className="font-semibold">Vessel Name:</span>{" "}
                             {info.vesselName}
@@ -378,11 +617,21 @@ export default function VesselAssignment() {
                             <span className="font-semibold">Principal:</span>{" "}
                             {info.principal}
                           </div>
-                        </>
+                          <div className="text-sm text-gray-700">
+                            <span className="font-semibold">Signed On:</span>{" "}
+                            {info.signedOn}
+                          </div>
+                          <div className="text-sm text-gray-700">
+                            <span className="font-semibold">Signed Off:</span>{" "}
+                            {info.signedOff}
+                          </div>
+                        </div>
                       );
                     })()
                   ) : (
-                    <div className="text-sm text-gray-500">Select a crew</div>
+                    <div className="text-sm text-gray-500 text-center py-8">
+                      Select a crew to view details
+                    </div>
                   )}
                 </div>
               </div>
@@ -391,109 +640,205 @@ export default function VesselAssignment() {
             {/* ASSIGNMENTS LIST */}
             <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-[#002060]">
+                <h2 className="text-xl font-bold text-[#003366]">
                   Vessel Assignments
                 </h2>
-                <span className="text-sm text-gray-500">
-                  Live updates from Firestore
-                </span>
+
+                <button
+                  onClick={handleExportPDF}
+                  className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  Export PDF
+                </button>
               </div>
 
-              {paginatedAssignments.length === 0 ? (
-                <div className="text-center py-10 text-gray-500">
-                  No assignments yet.
+              {/* Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+                <div className="relative">
+                  <div className="absolute left-3 top-3">
+                    <Search className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    value={assignmentSearch}
+                    onChange={(e) => setAssignmentSearch(e.target.value)}
+                    placeholder="Search assignments..."
+                    className="w-full pl-10 pr-4 py-2 rounded-lg border bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0B6FA4] text-sm"
+                  />
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {paginatedAssignments.map((a) => {
-                    const crew = crews.find((c) => c.id === a.crewId);
-                    return (
-                      <div
-                        key={a.id}
-                        className="border p-4 rounded-lg shadow-sm hover:shadow-md transition"
-                      >
-                        <div className="flex justify-between items-center mb-2">
-                          <p className="font-bold text-[#002060]">
-                            {a.crewName}
-                          </p>
-                          <span className="text-xs text-gray-500">
-                            {a.assignedDate}
-                          </span>
+
+                <select
+                  value={statusFilter}
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value as any)
+                  }
+                  className="px-4 py-2 rounded-lg border bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0B6FA4] text-sm"
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active Only</option>
+                  <option value="completed">Completed Only</option>
+                </select>
+
+                <select
+                  value={vesselTypeFilter}
+                  onChange={(e) => setVesselTypeFilter(e.target.value)}
+                  className="px-4 py-2 rounded-lg border bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0B6FA4] text-sm"
+                >
+                  <option value="all">All Vessel Types</option>
+                  {vesselTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  className={`px-4 py-2 rounded-lg border ${
+                    showHighlightOnly
+                      ? "bg-red-200 text-black"
+                      : "bg-gray-50"
+                  }`}
+                  onClick={() => setShowHighlightOnly(!showHighlightOnly)}
+                >
+                  Highlight {"<70 days"}
+
+                </button>
+              </div>
+
+              {/* Scrollable list */}
+              <div className="max-h-[520px] overflow-y-auto pr-2">
+                {paginatedAssignments.length === 0 ? (
+                  <div className="text-center py-10 text-gray-500">
+                    {filteredAssignments.length === 0 && vesselAssignments.length > 0
+                      ? "No assignments match your filters."
+                      : "No assignments yet."}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {paginatedAssignments.map((a) => {
+                      const daysOnboard = calculateDaysOnboard(a.signedOn, a.signedOff);
+                      const isActive = !a.signedOff;
+                      const isHighlight = daysOnboard < 70;
+                      const expiring = isExpiring(a.signedOn, a.signedOff);
+
+                      return (
+                        <div
+                          key={a.id}
+                          className={`border-l-4 ${
+                            isActive ? "border-green-500" : "border-gray-300"
+                          } p-4 rounded-lg shadow-sm hover:shadow-md transition bg-white ${
+                            isHighlight ? "bg-yellow-50" : ""
+                          }`}
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <p className="font-bold text-[#003366]">
+                                {a.crewName}
+                              </p>
+                              <span className="text-xs text-gray-500">
+                                Assigned: {a.assignedDate}
+                              </span>
+                            </div>
+
+                            <div className="flex gap-2">
+                              {expiring && (
+                                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-500 text-white">
+                                  Expiring
+                                </span>
+                              )}
+
+                              {isActive ? (
+                                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                                  Active
+                                </span>
+                              ) : (
+                                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
+                                  Completed
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="space-y-1 mb-3">
+                            <p className="text-sm text-gray-700">
+                              <span className="font-semibold">Vessel:</span>{" "}
+                              {a.vesselName}
+                            </p>
+                            <p className="text-sm text-gray-700">
+                              <span className="font-semibold">Type:</span>{" "}
+                              {a.vesselType}
+                            </p>
+                            <p className="text-sm text-gray-700">
+                              <span className="font-semibold">Principal:</span>{" "}
+                              {a.principal}
+                            </p>
+                            <p className="text-sm text-gray-700">
+                              <span className="font-semibold">Signed On:</span>{" "}
+                              {a.signedOn}
+                            </p>
+                            <p className="text-sm text-gray-700">
+                              <span className="font-semibold">Signed Off:</span>{" "}
+                              {a.signedOff || "Still onboard"}
+                            </p>
+                            <p className="text-sm text-gray-700">
+                              <span className="font-semibold">Days Onboard:</span>{" "}
+                              <span className="text-blue-600 font-bold">
+                                {daysOnboard} days
+                              </span>
+                            </p>
+                          </div>
+
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
+                              onClick={() => handleEditAssignment(a)}
+                              title="Edit Assignment"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
+                              onClick={() => handleUnassign(a.id!, a.crewId)}
+                              title="Unassign"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-
-                        <p className="text-gray-700">
-                          <span className="font-semibold">Status:</span>{" "}
-                          {crew?.status === "assigned" ? (
-                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                              Active
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
-                              {getStatusLabel(crew?.status)}
-                            </span>
-                          )}
-                        </p>
-
-                        <p className="text-gray-700">
-                          <span className="font-semibold">Vessel:</span>{" "}
-                          {a.vesselName}
-                        </p>
-                        <p className="text-gray-700">
-                          <span className="font-semibold">Type:</span>{" "}
-                          {a.vesselType}
-                        </p>
-                        <p className="text-gray-700">
-                          <span className="font-semibold">Principal:</span>{" "}
-                          {a.principal}
-                        </p>
-
-                        <div className="flex gap-2 justify-end mt-3">
-                          <button
-                            className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
-                            onClick={() => handleEditAssignment(a)}
-                            title="Edit Assignment"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-
-                          <button
-                            className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
-                            onClick={() => handleUnassign(a.id!, a.crewId)}
-                            title="Unassign"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
               {/* PAGINATION */}
-              <div className="flex justify-between items-center mt-6">
-                <span className="text-sm text-gray-600">
-                  Page {page} of {totalPages}
-                </span>
+              {totalPages > 1 && (
+                <div className="flex justify-between items-center mt-6">
+                  <span className="text-sm text-gray-600">
+                    Page {page} of {totalPages} • {filteredAssignments.length} total assignments
+                  </span>
 
-                <div className="flex gap-2">
-                  <button
-                    disabled={page === 1}
-                    onClick={() => setPage((p) => p - 1)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Previous
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={page === 1}
+                      onClick={() => setPage((p) => p - 1)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      Previous
+                    </button>
 
-                  <button
-                    disabled={page === totalPages}
-                    onClick={() => setPage((p) => p + 1)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Next
-                  </button>
+                    <button
+                      disabled={page === totalPages}
+                      onClick={() => setPage((p) => p + 1)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -501,10 +846,10 @@ export default function VesselAssignment() {
         {/* ===== MODAL ===== */}
         {showModal && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-6 w-11/12 md:w-1/2">
+            <div className="bg-white rounded-2xl p-6 w-11/12 md:w-1/2 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-bold flex items-center gap-2">
-                  <Ship className="w-5 h-5 text-blue-600" />
+                  <Ship className="w-5 h-5 text-[#0B6FA4]" />
                   {editAssignment ? "Edit Assignment" : "Assign Vessel"}
                 </h2>
                 <button
@@ -525,65 +870,109 @@ export default function VesselAssignment() {
                 }}
                 className="space-y-4"
               >
-                <label className="text-sm font-semibold text-[#002060]">
-                  Vessel Name
-                </label>
-                <input
-                  value={transferData.vesselName}
-                  onChange={(e) =>
-                    setTransferData({
-                      ...transferData,
-                      vesselName: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  placeholder="e.g., MV Ocean Star"
-                  required
-                />
+                <div>
+                  <label className="block text-sm font-semibold text-[#003366] mb-1">
+                    Vessel Name
+                  </label>
+                  <input
+                    value={transferData.vesselName}
+                    onChange={(e) =>
+                      setTransferData({
+                        ...transferData,
+                        vesselName: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[#0B6FA4]"
+                    placeholder="e.g., MV Ocean Star"
+                    required
+                  />
+                </div>
 
-                <label className="text-sm font-semibold text-[#002060]">
-                  Vessel Type
-                </label>
-                <select
-                  value={transferData.vesselType}
-                  onChange={(e) =>
-                    setTransferData({
-                      ...transferData,
-                      vesselType: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  required
-                >
-                  <option value="">Select vessel type</option>
-                  <option value="Container Ship">Container Ship</option>
-                  <option value="Tanker">Tanker</option>
-                  <option value="Bulk Carrier">Bulk Carrier</option>
-                  <option value="General Cargo">General Cargo</option>
-                  <option value="RoRo Ship">RoRo Ship</option>
-                  <option value="Refrigerated">Refrigerated</option>
-                </select>
+                <div>
+                  <label className="block text-sm font-semibold text-[#003366] mb-1">
+                    Vessel Type
+                  </label>
+                  <select
+                    value={transferData.vesselType}
+                    onChange={(e) =>
+                      setTransferData({
+                        ...transferData,
+                        vesselType: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[#0B6FA4]"
+                    required
+                  >
+                    <option value="">Select vessel type</option>
+                    <option value="Container Ship">Container Ship</option>
+                    <option value="Tanker">Tanker</option>
+                    <option value="Bulk Carrier">Bulk Carrier</option>
+                    <option value="General Cargo">General Cargo</option>
+                    <option value="RoRo Ship">RoRo Ship</option>
+                    <option value="Refrigerated">Refrigerated</option>
+                  </select>
+                </div>
 
-                <label className="text-sm font-semibold text-[#002060]">
-                  Principal / Shipping Company
-                </label>
-                <input
-                  value={transferData.principal}
-                  onChange={(e) =>
-                    setTransferData({
-                      ...transferData,
-                      principal: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  placeholder="e.g., Global Shipping Ltd."
-                  required
-                />
+                <div>
+                  <label className="block text-sm font-semibold text-[#003366] mb-1">
+                    Principal / Shipping Company
+                  </label>
+                  <input
+                    value={transferData.principal}
+                    onChange={(e) =>
+                      setTransferData({
+                        ...transferData,
+                        principal: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[#0B6FA4]"
+                    placeholder="e.g., Global Shipping Ltd."
+                    required
+                  />
+                </div>
 
-                <div className="flex justify-end gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-[#003366] mb-1">
+                    Sign On Date
+                  </label>
+                  <input
+                    type="date"
+                    value={transferData.signedOn}
+                    onChange={(e) =>
+                      setTransferData({
+                        ...transferData,
+                        signedOn: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[#0B6FA4]"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-[#003366] mb-1">
+                    Sign Off Date (Optional)
+                  </label>
+                  <input
+                    type="date"
+                    value={transferData.signedOff}
+                    onChange={(e) =>
+                      setTransferData({
+                        ...transferData,
+                        signedOff: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[#0B6FA4]"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Leave empty if crew is still onboard
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4">
                   <button
                     type="button"
-                    className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
+                    className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 transition"
                     onClick={() => {
                       setShowModal(false);
                       setEditAssignment(null);
@@ -594,7 +983,7 @@ export default function VesselAssignment() {
 
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-lg bg-[#0080C0] text-white hover:bg-blue-700 transition"
+                    className="px-4 py-2 rounded-lg bg-[#0B6FA4] text-white hover:bg-[#085A8A] transition"
                   >
                     {editAssignment ? "Update Assignment" : "Assign Vessel"}
                   </button>

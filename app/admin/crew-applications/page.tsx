@@ -43,6 +43,11 @@ export default function CrewApplications() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<CrewStatus | "all">("all");
 
+  // NEW: Highlight dropdown
+  const [highlightFilter, setHighlightFilter] = useState<
+    "all" | "highlighted"
+  >("all");
+
   const [page, setPage] = useState(1);
   const perPage = 8;
 
@@ -68,7 +73,7 @@ export default function CrewApplications() {
 
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery, statusFilter, highlightFilter]);
 
   /* ============================
      ACTION HANDLERS
@@ -124,8 +129,20 @@ export default function CrewApplications() {
       vesselType: lastVessel?.vesselType || crew.vesselType || "—",
       vesselName: lastVessel?.vesselName || "—",
       principal: lastVessel?.principal || "—",
+      signedOn: lastVessel?.signedOn || "—",
       signedOff: lastVessel?.signedOff || "—",
     };
+  };
+
+  const calculateDaysOnboard = (crew: CrewMember) => {
+    const last = crew.vesselExperience?.[0];
+    if (!last?.signedOn) return null;
+
+    const start = new Date(last.signedOn).getTime();
+    const end = last.signedOff ? new Date(last.signedOff).getTime() : Date.now();
+
+    const diff = Math.abs(end - start);
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
 
   /* ============================
@@ -145,8 +162,15 @@ export default function CrewApplications() {
       list = list.filter((c) => c.status === statusFilter);
     }
 
+    if (highlightFilter === "highlighted") {
+      list = list.filter((crew) => {
+        const days = calculateDaysOnboard(crew);
+        return days !== null && days < 70;
+      });
+    }
+
     return list;
-  }, [crews, searchQuery, statusFilter]);
+  }, [crews, searchQuery, statusFilter, highlightFilter]);
 
   const totalPages = Math.ceil(filteredCrews.length / perPage);
   const paginatedCrews = filteredCrews.slice(
@@ -166,6 +190,8 @@ export default function CrewApplications() {
 
     paginatedCrews.forEach((crew, index) => {
       const vessel = getVesselInfo(crew);
+      const days = calculateDaysOnboard(crew);
+      const isHighlighted = days !== null && days < 70;
 
       doc.setFontSize(11);
       doc.text(`${index + 1}. ${crew.fullName}`, 14, y);
@@ -173,19 +199,28 @@ export default function CrewApplications() {
       doc.text(`Vessel Type: ${vessel.vesselType}`, 14, y + 12);
       doc.text(`Vessel Name: ${vessel.vesselName}`, 14, y + 18);
       doc.text(`Principal: ${vessel.principal}`, 14, y + 24);
-      doc.text(`Signed Off: ${vessel.signedOff}`, 14, y + 30);
-      doc.text(`Age: ${getAge(crew.dateOfBirth)}`, 14, y + 36);
-      doc.text(`Email: ${crew.emailAddress}`, 14, y + 42);
+      doc.text(`Signed On: ${vessel.signedOn}`, 14, y + 30);
+      doc.text(`Signed Off: ${vessel.signedOff}`, 14, y + 36);
+      doc.text(`Days Onboard: ${days ?? "—"}`, 14, y + 42);
+
+      doc.text(`Age: ${getAge(crew.dateOfBirth)}`, 14, y + 48);
+      doc.text(`Email: ${crew.emailAddress}`, 14, y + 54);
       doc.text(
         `Status: ${
           crew.status === "assigned" ? "ACTIVE" : crew.status.toUpperCase()
         }`,
         14,
-        y + 48
+        y + 60
       );
-      doc.text(`Remarks: ${crew.remarks || "—"}`, 14, y + 54);
+      doc.text(`Remarks: ${crew.remarks || "—"}`, 14, y + 66);
 
-      y += 60;
+      if (isHighlighted) {
+        doc.setTextColor(255, 165, 0);
+        doc.text("⚠️ <70 days onboard", 150, y + 6);
+        doc.setTextColor(0, 0, 0);
+      }
+
+      y += 78;
       if (y > 270) {
         doc.addPage();
         y = 20;
@@ -211,56 +246,77 @@ export default function CrewApplications() {
             </div>
           </div>
 
-          {/* CONTENT */}
-          <div className="pt-24 px-6 pb-10">
-            {/* CONTROLS */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-              <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg border shadow-sm">
-                <Search className="w-4 h-4 text-gray-400" />
-                <input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search name, email, contact..."
-                  className="w-full outline-none text-sm"
-                />
-              </div>
-
-              <div className="flex items-center px-4 py-3 bg-white rounded-lg border shadow-sm">
-                <select
-                  value={statusFilter}
-                  onChange={(e) =>
-                    setStatusFilter(e.target.value as CrewStatus | "all")
-                  }
-                  className="w-full outline-none text-sm"
-                >
-                  <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="proposed">Proposed</option>
-                  <option value="approved">Approved</option>
-                  <option value="disapproved">Disapproved</option>
-                  <option value="fooled">Fooled</option>
-                  <option value="assigned">Active</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-2 md:col-span-2">
-                <button
-                  onClick={exportPDF}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white rounded-lg"
-                >
-                  <Download className="w-4 h-4" />
-                  Export PDF
-                </button>
-
-                <button
-                  onClick={() => setShowAddForm(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Crew
-                </button>
-              </div>
+        {/* CONTENT */}
+        <div className="pt-24 px-6 pb-10">
+          {/* CONTROLS */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+            
+            {/* SEARCH BAR */}
+            <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg border shadow-sm h-12">
+              <Search className="w-4 h-4 text-gray-400" />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search name, email, contact..."
+                className="w-full outline-none text-sm"
+              />
             </div>
+
+            {/* STATUS FILTER */}
+            <div className="flex items-center px-4 py-3 bg-white rounded-lg border shadow-sm h-12">
+              <select
+                value={statusFilter}
+                onChange={(e) =>
+                  setStatusFilter(e.target.value as CrewStatus | "all")
+                }
+                className="w-full outline-none text-sm"
+              >
+                <option value="all">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="proposed">Proposed</option>
+                <option value="approved">Approved</option>
+                <option value="disapproved">Disapproved</option>
+                <option value="fooled">Fooled</option>
+                <option value="assigned">Active</option>
+              </select>
+            </div>
+
+            {/* HIGHLIGHT FILTER */}
+            <div className="flex items-center px-4 py-3 bg-white rounded-lg border shadow-sm h-12">
+              <select
+                value={highlightFilter}
+                onChange={(e) =>
+                  setHighlightFilter(e.target.value as "all" | "highlighted")
+                }
+                className="w-full outline-none text-sm"
+              >
+                <option value="all">All Crew</option>
+                <option value="highlighted">Highlight {"<70 days"}</option>
+              </select>
+            </div>
+
+            {/* EMPTY SPACE */}
+            <div className="hidden md:block" />
+
+            {/* EXPORT + ADD CREW */}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={exportPDF}
+                className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white rounded-lg h-12"
+              >
+                <Download className="w-4 h-4" />
+                Export PDF
+              </button>
+
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg h-12"
+              >
+                <Plus className="w-4 h-4" />
+                Add Crew
+              </button>
+            </div>
+          </div>
 
             {/* TABLE */}
             <div className="bg-white rounded-xl shadow border overflow-hidden">
@@ -294,9 +350,18 @@ export default function CrewApplications() {
                   <tbody>
                     {paginatedCrews.map((crew) => {
                       const vessel = getVesselInfo(crew);
+                      const days = calculateDaysOnboard(crew);
+                      const isHighlighted = days !== null && days < 70;
 
                       return (
-                        <tr key={crew.id} className="hover:bg-blue-50">
+                        <tr
+                          key={crew.id}
+                          className={`hover:bg-blue-50 ${
+                            isHighlighted
+                              ? "bg-red-100 border-l-4 border-red-600"
+                              : ""
+                          }`}
+                        >
                           <td className="px-3 py-2 text-center">
                             {crew.presentRank}
                           </td>
@@ -333,6 +398,8 @@ export default function CrewApplications() {
                                   ? "bg-orange-400 text-gray-900"
                                   : crew.status === "proposed"
                                   ? "bg-yellow-100 text-yellow-700"
+                                  : crew.status === "fooled"
+                                  ? "bg-orange-100 text-orange-700"
                                   : "bg-red-100 text-red-700"
                               }`}
                             >
@@ -380,6 +447,31 @@ export default function CrewApplications() {
                 </table>
               </div>
             </div>
+
+            {/* PAGINATION */}
+            <div className="flex justify-between items-center mt-6">
+              <span className="text-sm text-gray-600">
+                Page {page} of {totalPages}
+              </span>
+
+              <div className="flex gap-2">
+                <button
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Previous
+                </button>
+
+                <button
+                  disabled={page === totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
 
           {selectedCrew && (
@@ -396,21 +488,19 @@ export default function CrewApplications() {
           {showAddForm && (
             <CrewApplicationForm
               mode="add"
-              onClose={() => setShowAddForm(false)} onSuccess={function (): void {
-                throw new Error("Function not implemented.");
-              } }            />
+              onClose={() => setShowAddForm(false)}
+              onSuccess={() => setShowAddForm(false)}
+            />
           )}
 
           {editCrew && (
-          <CrewApplicationForm
-            mode="edit"
-            crew={editCrew}
-            onClose={() => setEditCrew(null)}
-            onSuccess={() => {
-              setEditCrew(null);
-            }}
-          />
-        )}
+            <CrewApplicationForm
+              mode="edit"
+              crew={editCrew}
+              onClose={() => setEditCrew(null)}
+              onSuccess={() => setEditCrew(null)}
+            />
+          )}
 
           {showDeleteConfirm && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
