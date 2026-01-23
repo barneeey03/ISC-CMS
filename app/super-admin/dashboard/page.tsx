@@ -41,6 +41,7 @@ const STATUS_STYLE: Record<string, { color: string; bg: string }> = {
   disapproved: { color: "#EF4444", bg: "#EF444422" },
   fooled: { color: "#8B5CF6", bg: "#8B5CF622" },
   proposed: { color: "#0EA5E9", bg: "#0EA5E922" },
+  assigned: { color: "#10B981", bg: "#10B98122" },
 };
 
 const getStatusStyle = (status: string) =>
@@ -59,6 +60,7 @@ export default function SuperAdminDashboard() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotif, setShowNotif] = useState(false);
 
+  // Fetch crew applications
   useEffect(() => {
     const crewRef = collection(db, "crewApplications");
 
@@ -127,7 +129,7 @@ export default function SuperAdminDashboard() {
   };
 
   const [statusFilter, setStatusFilter] =
-    useState<"all" | "approved" | "pending" | "disapproved" | "fooled" | "proposed">("all");
+    useState<"all" | "approved" | "pending" | "disapproved" | "fooled" | "proposed" | "assigned">("all");
 
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
@@ -185,11 +187,11 @@ export default function SuperAdminDashboard() {
   );
 
   const total = filteredCrews.length;
-  const active = filteredCrews.filter((c) => c.status === "pending").length;
   const approved = filteredCrews.filter((c) => c.status === "approved").length;
   const disapproved = filteredCrews.filter((c) => c.status === "disapproved").length;
   const fooled = filteredCrews.filter((c) => c.status === "fooled").length;
   const proposed = filteredCrews.filter((c) => c.status === "proposed").length;
+  const assigned = filteredCrews.filter((c) => c.status === "assigned").length;
 
   const monthlyData = useMemo(() => {
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -317,11 +319,12 @@ export default function SuperAdminDashboard() {
               className="h-10 px-3 rounded border bg-white text-sm shadow-sm"
             >
               <option value="all">All Status</option>
-              <option value="pending">Active</option>
+              <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="disapproved">Disapproved</option>
               <option value="fooled">Fooled</option>
               <option value="proposed">Proposed</option>
+              <option value="assigned">Active Crews</option>
             </select>
 
             <input
@@ -358,11 +361,11 @@ export default function SuperAdminDashboard() {
           {/* STAT CARDS */}
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             <StatCard title="Total Crew" value={total} icon={<Users />} />
-            <StatCard title="Active" value={active} icon={<TrendingUp />} />
+            <StatCard title="Proposed" value={proposed} icon={<TrendingUp />} />
             <StatCard title="Approved" value={approved} icon={<FileCheck />} />
             <StatCard title="Disapproved" value={disapproved} icon={<XCircle />} />
             <StatCard title="Fooled" value={fooled} icon={<XCircle />} />
-            <StatCard title="Proposed" value={proposed} icon={<XCircle />} />
+            <StatCard title="Active Crews" value={assigned} icon={<Users />} />
           </div>
 
           {/* CHARTS */}
@@ -388,10 +391,10 @@ export default function SuperAdminDashboard() {
                   <Pie
                     data={[
                       { name: "Approved", value: approved },
-                      { name: "Active", value: active },
+                      { name: "Proposed", value: proposed },
                       { name: "Disapproved", value: disapproved },
                       { name: "Fooled", value: fooled },
-                      { name: "Proposed", value: proposed }
+                      { name: "Active Crews", value: assigned }
                     ]}
                     dataKey="value"
                     outerRadius={90}
@@ -399,10 +402,10 @@ export default function SuperAdminDashboard() {
                     label
                   >
                     <Cell fill="#22C55E" />
-                    <Cell fill="#F59E0B" />
+                    <Cell fill="#0EA5E9" />
                     <Cell fill="#EF4444" />
                     <Cell fill="#8B5CF6" />
-                    <Cell fill="#0EA5E9" />
+                    <Cell fill="#10B981" />
                   </Pie>
                   <Legend />
                 </PieChart>
@@ -445,7 +448,7 @@ export default function SuperAdminDashboard() {
                           className="px-2 py-1 rounded-full text-xs font-semibold"
                           style={{ background: s.bg, color: s.color }}
                         >
-                          {c.status.toUpperCase()}
+                          {c.status === "assigned" ? "ACTIVE" : c.status.toUpperCase()}
                         </span>
                       </td>
                       <td className="p-2">
