@@ -19,15 +19,21 @@ import {
 import { onSnapshot, collection } from "firebase/firestore";
 import { db } from "@/app/lib/firebase";
 
+type CrewStatus =
+  | "pending"
+  | "proposed"
+  | "approved"
+  | "disapproved"
+  | "fooled"
+  | "assigned";
+
 export default function SuperAdminCrewApplications() {
   const [crews, setCrews] = useState<CrewMember[]>([]);
   const [selectedCrew, setSelectedCrew] = useState<CrewMember | null>(null);
   const [editCrew, setEditCrew] = useState<CrewMember | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | "pending" | "proposed" | "approved" | "disapproved" | "fooled"
-  >("all");
+  const [statusFilter, setStatusFilter] = useState<CrewStatus | "all">("all");
 
   const [page, setPage] = useState(1);
   const perPage = 8;
@@ -39,13 +45,10 @@ export default function SuperAdminCrewApplications() {
     const crewRef = collection(db, "crewApplications");
 
     const unsubscribe = onSnapshot(crewRef, (snapshot) => {
-      const list: CrewMember[] = [];
-      snapshot.forEach((doc) => {
-        list.push({
-          ...(doc.data() as any),
-          id: doc.id,
-        });
-      });
+      const list: CrewMember[] = snapshot.docs.map((doc) => ({
+        ...(doc.data() as any),
+        id: doc.id,
+      }));
       setCrews(list);
     });
 
@@ -56,20 +59,19 @@ export default function SuperAdminCrewApplications() {
     setPage(1);
   }, [searchQuery, statusFilter]);
 
+  /* ============================
+     ACTION HANDLERS
+  ============================ */
   const handleApprove = async (id: string) => {
-    const payload = { status: "approved" };
-
-    await updateCrewInFirestore(id, payload);
-    await updateCrewDatabaseInFirestore(id, payload);
+    await updateCrewInFirestore(id, { status: "approved" });
+    await updateCrewDatabaseInFirestore(id, { status: "approved" });
 
     setSelectedCrew(null);
     setStatusFilter("all");
   };
 
   const handleDisapprove = async (id: string, reconsider?: boolean) => {
-    const payload = {
-      status: reconsider ? "fooled" : "disapproved",
-    };
+    const payload = { status: reconsider ? "fooled" : "disapproved" };
 
     await updateCrewInFirestore(id, payload);
     await updateCrewDatabaseInFirestore(id, payload);
@@ -79,20 +81,16 @@ export default function SuperAdminCrewApplications() {
   };
 
   const handleProposed = async (id: string) => {
-    const payload = { status: "proposed" };
-
-    await updateCrewInFirestore(id, payload);
-    await updateCrewDatabaseInFirestore(id, payload);
+    await updateCrewInFirestore(id, { status: "proposed" });
+    await updateCrewDatabaseInFirestore(id, { status: "proposed" });
 
     setSelectedCrew(null);
     setStatusFilter("all");
   };
 
   const handleFooled = async (id: string) => {
-    const payload = { status: "fooled" };
-
-    await updateCrewInFirestore(id, payload);
-    await updateCrewDatabaseInFirestore(id, payload);
+    await updateCrewInFirestore(id, { status: "fooled" });
+    await updateCrewDatabaseInFirestore(id, { status: "fooled" });
 
     setSelectedCrew(null);
     setStatusFilter("all");
@@ -106,30 +104,32 @@ export default function SuperAdminCrewApplications() {
     setDeleteTargetId(null);
   };
 
-  const handleEdit = (crew: CrewMember) => {
-    setEditCrew(crew);
-  };
-
-  const getAge = (dob: string | undefined) => {
+  /* ============================
+     HELPERS
+  ============================ */
+  const getAge = (dob?: string) => {
     if (!dob) return "—";
-    const birthDate = new Date(dob);
-    if (isNaN(birthDate.getTime())) return "—";
-
-    const diff = Date.now() - birthDate.getTime();
-    const ageDate = new Date(diff);
-    return Math.abs(ageDate.getUTCFullYear() - 1970);
+    const birth = new Date(dob);
+    if (isNaN(birth.getTime())) return "—";
+    return Math.abs(
+      new Date(Date.now() - birth.getTime()).getUTCFullYear() - 1970
+    );
   };
 
   const getVesselInfo = (crew: CrewMember) => {
     const lastVessel = crew.vesselExperience?.[0];
 
     return {
+      vesselType: lastVessel?.vesselType || crew.vesselType || "—",
       vesselName: lastVessel?.vesselName || "—",
       principal: lastVessel?.principal || "—",
-      signedOff: lastVessel?.signedOn || "—",
+      signedOff: lastVessel?.signedOff || "—",
     };
   };
 
+  /* ============================
+     FILTERING + PAGINATION
+  ============================ */
   const filteredCrews = useMemo(() => {
     let list = crews.filter((crew) => {
       const q = searchQuery.toLowerCase();
@@ -153,6 +153,9 @@ export default function SuperAdminCrewApplications() {
     page * perPage
   );
 
+  /* ============================
+     PDF EXPORT
+  ============================ */
   const exportPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(14);
@@ -161,18 +164,24 @@ export default function SuperAdminCrewApplications() {
     let y = 35;
 
     paginatedCrews.forEach((crew, index) => {
-      const vesselInfo = getVesselInfo(crew);
+      const vessel = getVesselInfo(crew);
 
       doc.setFontSize(11);
       doc.text(`${index + 1}. ${crew.fullName}`, 14, y);
       doc.text(`Rank: ${crew.presentRank}`, 14, y + 6);
-      doc.text(`Vessel Type: ${crew.vesselType}`, 14, y + 12);
-      doc.text(`Vessel Name: ${vesselInfo.vesselName}`, 14, y + 18);
-      doc.text(`Principal: ${vesselInfo.principal}`, 14, y + 24);
-      doc.text(`Signed Off: ${vesselInfo.signedOff}`, 14, y + 30);
+      doc.text(`Vessel Type: ${vessel.vesselType}`, 14, y + 12);
+      doc.text(`Vessel Name: ${vessel.vesselName}`, 14, y + 18);
+      doc.text(`Principal: ${vessel.principal}`, 14, y + 24);
+      doc.text(`Signed Off: ${vessel.signedOff}`, 14, y + 30);
       doc.text(`Age: ${getAge(crew.dateOfBirth)}`, 14, y + 36);
       doc.text(`Email: ${crew.emailAddress}`, 14, y + 42);
-      doc.text(`Status: ${crew.status.toUpperCase()}`, 14, y + 48);
+      doc.text(
+        `Status: ${
+          crew.status === "assigned" ? "ACTIVE" : crew.status.toUpperCase()
+        }`,
+        14,
+        y + 48
+      );
       doc.text(`Remarks: ${crew.remarks || "—"}`, 14, y + 54);
 
       y += 60;
@@ -185,12 +194,16 @@ export default function SuperAdminCrewApplications() {
     doc.save("crew_applications_report.pdf");
   };
 
+  /* ============================
+     RENDER
+  ============================ */
   return (
     <ProtectedRoute requiredRole="super-admin">
       <div className="flex">
         <SuperAdminSidebar />
 
         <div className="flex-1 min-h-screen lg:ml-64 bg-gray-50">
+          {/* HEADER */}
           <div className="fixed top-0 left-0 right-0 z-20 lg:ml-64 bg-white border-b shadow-sm">
             <div className="flex justify-between items-center px-6 py-4">
               <h1 className="text-xl font-semibold tracking-tight">
@@ -199,6 +212,7 @@ export default function SuperAdminCrewApplications() {
             </div>
           </div>
 
+          {/* CONTENT */}
           <div className="pt-24 px-6 pb-10">
             {/* CONTROLS */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
@@ -216,7 +230,9 @@ export default function SuperAdminCrewApplications() {
               <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg shadow-sm border">
                 <select
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value as CrewStatus | "all")
+                  }
                   className="w-full outline-none text-sm text-gray-700"
                 >
                   <option value="all">All Status</option>
@@ -242,92 +258,79 @@ export default function SuperAdminCrewApplications() {
 
             {/* TABLE */}
             <div className="bg-white rounded-xl shadow border overflow-hidden">
-              {/* IMPORTANT: Set height and allow vertical scroll */}
-              <div className="max-h-130 overflow-y-auto overflow-x-hidden">
-                <table className="min-w-full table-fixed">
-                  <thead className="bg-blue-200">
+              <div className="max-h-130 overflow-y-auto">
+                <table className="w-full">
+                  <thead className="bg-blue-200 sticky top-0">
                     <tr>
-                      <th className="w-[8%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
-                        Rank
-                      </th>
-                      <th className="w-[12%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
-                        Name
-                      </th>
-                      <th className="w-[10%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
-                        Vessel Type
-                      </th>
-                      <th className="w-[12%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
-                        Vessel Name
-                      </th>
-                      <th className="w-[12%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
-                        Principal
-                      </th>
-                      <th className="w-[10%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
-                        Signed Off
-                      </th>
-                      <th className="w-[6%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
-                        Age
-                      </th>
-                      <th className="w-[14%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
-                        Email
-                      </th>
-                      <th className="w-[8%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
-                        Status
-                      </th>
-                      <th className="w-[14%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
-                        Remarks
-                      </th>
-                      <th className="w-[10%] px-4 py-3 text-center text-xs font-semibold text-gray-800">
-                        Action
-                      </th>
+                      {[
+                        "Rank",
+                        "Name",
+                        "Vessel Type",
+                        "Vessel Name",
+                        "Principal",
+                        "Signed Off",
+                        "Age",
+                        "Email",
+                        "Status",
+                        "Remarks",
+                        "Action",
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          className="px-3 py-2 text-xs font-semibold text-center"
+                        >
+                          {h}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
 
-                  <tbody className="divide-y bg-white">
+                  <tbody>
                     {paginatedCrews.map((crew) => {
-                      const vesselInfo = getVesselInfo(crew);
+                      const vessel = getVesselInfo(crew);
 
                       return (
                         <tr key={crew.id} className="hover:bg-blue-50">
-                          <td className="px-4 py-3 text-center text-gray-600">
+                          <td className="px-3 py-2 text-center">
                             {crew.presentRank}
                           </td>
-                          <td className="px-4 py-3 text-center font-medium text-gray-800">
+                          <td className="px-3 py-2 text-center font-medium">
                             {crew.fullName}
                           </td>
-                          <td className="px-4 py-3 text-center text-gray-600">
-                            {crew.vesselType}
+                          <td className="px-3 py-2 text-center">
+                            {vessel.vesselType}
                           </td>
-                          <td className="px-4 py-3 text-center text-gray-600 truncate">
-                            {vesselInfo.vesselName}
+                          <td className="px-3 py-2 text-center">
+                            {vessel.vesselName}
                           </td>
-                          <td className="px-4 py-3 text-center text-gray-600 truncate">
-                            {vesselInfo.principal}
+                          <td className="px-3 py-2 text-center">
+                            {vessel.principal}
                           </td>
-                          <td className="px-4 py-3 text-center text-gray-600">
-                            {vesselInfo.signedOff}
+                          <td className="px-3 py-2 text-center">
+                            {vessel.signedOff}
                           </td>
-                          <td className="px-4 py-3 text-center text-gray-600">
+                          <td className="px-3 py-2 text-center">
                             {getAge(crew.dateOfBirth)}
                           </td>
-                          <td className="px-4 py-3 text-center text-gray-600 truncate">
+                          <td className="px-3 py-2 text-center">
                             {crew.emailAddress}
                           </td>
 
-                          <td className="px-4 py-3 text-center">
+                          <td className="px-3 py-2 text-center">
                             <span
-                              className={`px-3 py-1 rounded-full text-xs font-semibold
-                                ${crew.status === "approved"
+                              className={`px-2 py-1 rounded-full text-xs font-semibold
+                              ${
+                                crew.status === "approved" ||
+                                crew.status === "assigned"
                                   ? "bg-green-100 text-green-700"
-                                  : crew.status === "proposed"
-                                  ? "bg-yellow-100 text-yellow-700"
                                   : crew.status === "pending"
                                   ? "bg-orange-400 text-gray-900"
+                                  : crew.status === "proposed"
+                                  ? "bg-yellow-100 text-yellow-700"
                                   : crew.status === "fooled"
                                   ? "bg-orange-100 text-orange-700"
-                                  : crew.status === "assigned"
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-red-100 text-red-700"}`}
+                                  : "bg-red-100 text-red-700"
+                              }`}
                             >
                               {crew.status === "assigned"
                                 ? "ACTIVE"
@@ -335,24 +338,22 @@ export default function SuperAdminCrewApplications() {
                             </span>
                           </td>
 
-                          <td className="px-4 py-3 text-center text-gray-600 truncate">
-                            {crew.remarks || "No remarks"}
+                          <td className="px-3 py-2 text-center">
+                            {crew.remarks || "—"}
                           </td>
 
-                          <td className="px-4 py-3">
+                          <td className="px-3 py-2">
                             <div className="flex gap-2 justify-center">
                               <button
                                 onClick={() => setSelectedCrew(crew)}
-                                className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
-                                title="View Details"
+                                className="p-2 bg-blue-100 rounded-lg"
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
 
                               <button
-                                onClick={() => handleEdit(crew)}
-                                className="p-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition"
-                                title="Edit"
+                                onClick={() => setEditCrew(crew)}
+                                className="p-2 bg-green-100 rounded-lg"
                               >
                                 <Edit2 className="w-4 h-4" />
                               </button>
@@ -362,8 +363,7 @@ export default function SuperAdminCrewApplications() {
                                   setDeleteTargetId(crew.id);
                                   setShowDeleteConfirm(true);
                                 }}
-                                className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
-                                title="Delete"
+                                className="p-2 bg-red-100 rounded-lg"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -419,28 +419,24 @@ export default function SuperAdminCrewApplications() {
               mode="edit"
               crew={editCrew}
               onClose={() => setEditCrew(null)}
-              onSuccess={() => {}}
+              onSuccess={() => setEditCrew(null)}
             />
           )}
 
           {showDeleteConfirm && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-2xl p-6 w-11/12 md:w-1/3 border">
-                <h2 className="text-lg font-bold mb-3">Delete Confirmation</h2>
-                <p className="text-gray-700 mb-6">
-                  Are you sure you want to delete this crew?
-                </p>
-
+              <div className="bg-white p-6 rounded-2xl">
+                <h2 className="font-bold mb-4">Delete Confirmation</h2>
                 <div className="flex justify-end gap-3">
                   <button
-                    className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
                     onClick={() => setShowDeleteConfirm(false)}
+                    className="px-4 py-2 bg-gray-200 rounded-lg"
                   >
                     No
                   </button>
                   <button
-                    className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
                     onClick={confirmDelete}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg"
                   >
                     Yes
                   </button>

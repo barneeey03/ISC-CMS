@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { AdminSidebar } from "@/app/components/AdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 import { CrewApplicationForm } from "@/app/components/CrewApplicationForm";
@@ -15,26 +15,33 @@ import {
   Download,
   Search,
 } from "lucide-react";
+
 import jsPDF from "jspdf";
 
 import {
-  getCrewApplications,
   updateCrewInFirestore,
   deleteCrewFromFirestore,
 } from "@/app/lib/crewservice";
 
-export default function CrewApplications() {
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [showEditForm, setShowEditForm] = useState(false);
+import { onSnapshot, collection } from "firebase/firestore";
+import { db } from "@/app/lib/firebase";
 
+type CrewStatus =
+  | "pending"
+  | "proposed"
+  | "approved"
+  | "disapproved"
+  | "fooled"
+  | "assigned";
+
+export default function CrewApplications() {
   const [crews, setCrews] = useState<CrewMember[]>([]);
   const [selectedCrew, setSelectedCrew] = useState<CrewMember | null>(null);
   const [editCrew, setEditCrew] = useState<CrewMember | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | "pending" | "proposed" | "approved" | "disapproved" | "fooled"
-  >("all");
+  const [statusFilter, setStatusFilter] = useState<CrewStatus | "all">("all");
 
   const [page, setPage] = useState(1);
   const perPage = 8;
@@ -42,22 +49,32 @@ export default function CrewApplications() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
-  const refreshCrews = useCallback(async () => {
-    const list = await getCrewApplications();
-    setCrews(list);
-  }, []);
-
+  /* ============================
+     REAL-TIME FIRESTORE SYNC
+  ============================ */
   useEffect(() => {
-    refreshCrews();
-  }, [refreshCrews]);
+    const ref = collection(db, "crewApplications");
+
+    const unsubscribe = onSnapshot(ref, (snapshot) => {
+      const list: CrewMember[] = snapshot.docs.map((doc) => ({
+        ...(doc.data() as any),
+        id: doc.id,
+      }));
+      setCrews(list);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     setPage(1);
   }, [searchQuery, statusFilter]);
 
+  /* ============================
+     ACTION HANDLERS
+  ============================ */
   const handleApprove = async (id: string) => {
     await updateCrewInFirestore(id, { status: "approved" });
-    await refreshCrews();
     setSelectedCrew(null);
     setStatusFilter("all");
   };
@@ -66,21 +83,18 @@ export default function CrewApplications() {
     await updateCrewInFirestore(id, {
       status: reconsider ? "fooled" : "disapproved",
     });
-    await refreshCrews();
     setSelectedCrew(null);
     setStatusFilter("all");
   };
 
   const handleProposed = async (id: string) => {
     await updateCrewInFirestore(id, { status: "proposed" });
-    await refreshCrews();
     setSelectedCrew(null);
     setStatusFilter("all");
   };
 
   const handleFooled = async (id: string) => {
     await updateCrewInFirestore(id, { status: "fooled" });
-    await refreshCrews();
     setSelectedCrew(null);
     setStatusFilter("all");
   };
@@ -88,34 +102,24 @@ export default function CrewApplications() {
   const confirmDelete = async () => {
     if (!deleteTargetId) return;
     await deleteCrewFromFirestore(deleteTargetId);
-    await refreshCrews();
     setShowDeleteConfirm(false);
     setDeleteTargetId(null);
   };
 
-  const handleEdit = (crew: CrewMember) => {
-    setEditCrew(crew);
-    setShowEditForm(true);
-  };
-
-  const handleEditSuccess = async () => {
-    await refreshCrews();
-    // If we're viewing this crew in the modal, close it so it refreshes
-    if (selectedCrew && editCrew && selectedCrew.id === editCrew.id) {
-      setSelectedCrew(null);
-    }
-  };
-
+  /* ============================
+     HELPERS
+  ============================ */
   const getAge = (dob?: string) => {
     if (!dob) return "—";
     const birth = new Date(dob);
     if (isNaN(birth.getTime())) return "—";
-    return Math.abs(new Date(Date.now() - birth.getTime()).getUTCFullYear() - 1970);
+    return Math.abs(
+      new Date(Date.now() - birth.getTime()).getUTCFullYear() - 1970
+    );
   };
 
   const getVesselInfo = (crew: CrewMember) => {
     const lastVessel = crew.vesselExperience?.[0];
-
     return {
       vesselType: lastVessel?.vesselType || crew.vesselType || "—",
       vesselName: lastVessel?.vesselName || "—",
@@ -124,6 +128,9 @@ export default function CrewApplications() {
     };
   };
 
+  /* ============================
+     FILTERING + PAGINATION
+  ============================ */
   const filteredCrews = useMemo(() => {
     let list = crews.filter((crew) => {
       const q = searchQuery.toLowerCase();
@@ -147,6 +154,9 @@ export default function CrewApplications() {
     page * perPage
   );
 
+  /* ============================
+     PDF EXPORT
+  ============================ */
   const exportPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(14);
@@ -166,7 +176,13 @@ export default function CrewApplications() {
       doc.text(`Signed Off: ${vessel.signedOff}`, 14, y + 30);
       doc.text(`Age: ${getAge(crew.dateOfBirth)}`, 14, y + 36);
       doc.text(`Email: ${crew.emailAddress}`, 14, y + 42);
-      doc.text(`Status: ${crew.status.toUpperCase()}`, 14, y + 48);
+      doc.text(
+        `Status: ${
+          crew.status === "assigned" ? "ACTIVE" : crew.status.toUpperCase()
+        }`,
+        14,
+        y + 48
+      );
       doc.text(`Remarks: ${crew.remarks || "—"}`, 14, y + 54);
 
       y += 60;
@@ -179,6 +195,9 @@ export default function CrewApplications() {
     doc.save("crew_applications_report.pdf");
   };
 
+  /* ============================
+     RENDER
+  ============================ */
   return (
     <ProtectedRoute requiredRole="admin">
       <div className="flex">
@@ -188,9 +207,7 @@ export default function CrewApplications() {
           {/* HEADER */}
           <div className="fixed top-0 left-0 right-0 z-20 lg:ml-64 bg-white border-b shadow-sm">
             <div className="flex justify-between items-center px-6 py-4">
-              <h1 className="text-xl font-semibold tracking-tight">
-                Crew Applications
-              </h1>
+              <h1 className="text-xl font-semibold">Crew Applications</h1>
             </div>
           </div>
 
@@ -198,24 +215,23 @@ export default function CrewApplications() {
           <div className="pt-24 px-6 pb-10">
             {/* CONTROLS */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-              {/* SEARCH */}
-              <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg shadow-sm border">
+              <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg border shadow-sm">
                 <Search className="w-4 h-4 text-gray-400" />
                 <input
-                  type="text"
-                  placeholder="Search name, email, contact..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full outline-none text-sm text-gray-700"
+                  placeholder="Search name, email, contact..."
+                  className="w-full outline-none text-sm"
                 />
               </div>
 
-              {/* STATUS DROPDOWN */}
-              <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg shadow-sm border">
+              <div className="flex items-center px-4 py-3 bg-white rounded-lg border shadow-sm">
                 <select
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
-                  className="w-full outline-none text-sm text-gray-700"
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value as CrewStatus | "all")
+                  }
+                  className="w-full outline-none text-sm"
                 >
                   <option value="all">All Status</option>
                   <option value="pending">Pending</option>
@@ -227,11 +243,10 @@ export default function CrewApplications() {
                 </select>
               </div>
 
-              {/* BUTTONS */}
-              <div className="flex items-center justify-end gap-2 md:col-span-2">
+              <div className="flex justify-end gap-2 md:col-span-2">
                 <button
                   onClick={exportPDF}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white rounded-lg shadow-sm hover:bg-blue-600 transition"
+                  className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white rounded-lg"
                 >
                   <Download className="w-4 h-4" />
                   Export PDF
@@ -239,7 +254,7 @@ export default function CrewApplications() {
 
                 <button
                   onClick={() => setShowAddForm(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-500 transition"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg"
                 >
                   <Plus className="w-4 h-4" />
                   Add Crew
@@ -249,100 +264,77 @@ export default function CrewApplications() {
 
             {/* TABLE */}
             <div className="bg-white rounded-xl shadow border overflow-hidden">
-              <div className="max-h-130 overflow-y-auto overflow-x-hidden">
+              <div className="max-h-130 overflow-y-auto">
                 <table className="w-full">
                   <thead className="bg-blue-200 sticky top-0">
                     <tr>
-                      <th className="px-3 py-2 text-center text-xs font-semibold text-gray-800">
-                        Rank
-                      </th>
-                      <th className="px-3 py-2 text-center text-xs font-semibold text-gray-800">
-                        Name
-                      </th>
-                      <th className="px-3 py-2 text-center text-xs font-semibold text-gray-800">
-                        Vessel Type
-                      </th>
-
-                      {/* Hidden on mobile */}
-                      <th className="hidden md:table-cell px-3 py-2 text-center text-xs font-semibold text-gray-800">
-                        Vessel Name
-                      </th>
-                      <th className="hidden md:table-cell px-3 py-2 text-center text-xs font-semibold text-gray-800">
-                        Principal
-                      </th>
-                      <th className="hidden md:table-cell px-3 py-2 text-center text-xs font-semibold text-gray-800">
-                        Signed Off
-                      </th>
-
-                      <th className="px-3 py-2 text-center text-xs font-semibold text-gray-800">
-                        Age
-                      </th>
-
-                      {/* Hidden on mobile */}
-                      <th className="hidden md:table-cell px-3 py-2 text-center text-xs font-semibold text-gray-800">
-                        Email
-                      </th>
-
-                      <th className="px-3 py-2 text-center text-xs font-semibold text-gray-800">
-                        Status
-                      </th>
-                      <th className="hidden lg:table-cell px-3 py-2 text-center text-xs font-semibold text-gray-800">
-                        Remarks
-                      </th>
-                      <th className="px-3 py-2 text-center text-xs font-semibold text-gray-800">
-                        Action
-                      </th>
+                      {[
+                        "Rank",
+                        "Name",
+                        "Vessel Type",
+                        "Vessel Name",
+                        "Principal",
+                        "Signed Off",
+                        "Age",
+                        "Email",
+                        "Status",
+                        "Remarks",
+                        "Action",
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          className="px-3 py-2 text-xs font-semibold text-center"
+                        >
+                          {h}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
 
                   <tbody>
                     {paginatedCrews.map((crew) => {
-                      const vesselInfo = getVesselInfo(crew);
+                      const vessel = getVesselInfo(crew);
 
                       return (
                         <tr key={crew.id} className="hover:bg-blue-50">
-                          <td className="px-3 py-2 text-center text-gray-600">
+                          <td className="px-3 py-2 text-center">
                             {crew.presentRank}
                           </td>
-                          <td className="px-3 py-2 text-center font-medium text-gray-800">
+                          <td className="px-3 py-2 text-center font-medium">
                             {crew.fullName}
                           </td>
-                          <td className="px-3 py-2 text-center text-gray-600">
-                            {vesselInfo.vesselType}
+                          <td className="px-3 py-2 text-center">
+                            {vessel.vesselType}
                           </td>
-
-                          <td className="hidden md:table-cell px-3 py-2 text-center text-gray-600">
-                            {vesselInfo.vesselName}
+                          <td className="px-3 py-2 text-center">
+                            {vessel.vesselName}
                           </td>
-                          <td className="hidden md:table-cell px-3 py-2 text-center text-gray-600">
-                            {vesselInfo.principal}
+                          <td className="px-3 py-2 text-center">
+                            {vessel.principal}
                           </td>
-                          <td className="hidden md:table-cell px-3 py-2 text-center text-gray-600">
-                            {vesselInfo.signedOff}
+                          <td className="px-3 py-2 text-center">
+                            {vessel.signedOff}
                           </td>
-
-                          <td className="px-3 py-2 text-center text-gray-600">
+                          <td className="px-3 py-2 text-center">
                             {getAge(crew.dateOfBirth)}
                           </td>
-
-                          <td className="hidden md:table-cell px-3 py-2 text-center text-gray-600">
+                          <td className="px-3 py-2 text-center">
                             {crew.emailAddress}
                           </td>
 
                           <td className="px-3 py-2 text-center">
                             <span
                               className={`px-2 py-1 rounded-full text-xs font-semibold
-                              ${crew.status === "approved"
-                                ? "bg-green-100 text-green-700"
-                                : crew.status === "proposed"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : crew.status === "pending"
-                                ? "bg-orange-400 text-gray-900"
-                                : crew.status === "fooled"
-                                ? "bg-orange-100 text-orange-700"
-                                : crew.status === "assigned"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-red-100 text-red-700"}`}
+                              ${
+                                crew.status === "approved" ||
+                                crew.status === "assigned"
+                                  ? "bg-green-100 text-green-700"
+                                  : crew.status === "pending"
+                                  ? "bg-orange-400 text-gray-900"
+                                  : crew.status === "proposed"
+                                  ? "bg-yellow-100 text-yellow-700"
+                                  : "bg-red-100 text-red-700"
+                              }`}
                             >
                               {crew.status === "assigned"
                                 ? "ACTIVE"
@@ -350,24 +342,22 @@ export default function CrewApplications() {
                             </span>
                           </td>
 
-                          <td className="hidden lg:table-cell px-3 py-2 text-center text-gray-600">
-                            {crew.remarks || "No remarks"}
+                          <td className="px-3 py-2 text-center">
+                            {crew.remarks || "—"}
                           </td>
 
                           <td className="px-3 py-2">
                             <div className="flex gap-2 justify-center">
                               <button
                                 onClick={() => setSelectedCrew(crew)}
-                                className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
-                                title="View Details"
+                                className="p-2 bg-blue-100 rounded-lg"
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
 
                               <button
-                                onClick={() => handleEdit(crew)}
-                                className="p-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition"
-                                title="Edit"
+                                onClick={() => setEditCrew(crew)}
+                                className="p-2 bg-green-100 rounded-lg"
                               >
                                 <Edit2 className="w-4 h-4" />
                               </button>
@@ -377,8 +367,7 @@ export default function CrewApplications() {
                                   setDeleteTargetId(crew.id);
                                   setShowDeleteConfirm(true);
                                 }}
-                                className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
-                                title="Delete"
+                                className="p-2 bg-red-100 rounded-lg"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -389,31 +378,6 @@ export default function CrewApplications() {
                     })}
                   </tbody>
                 </table>
-              </div>
-            </div>
-
-            {/* PAGINATION */}
-            <div className="flex justify-between items-center mt-6">
-              <span className="text-sm text-gray-600">
-                Page {page} of {totalPages}
-              </span>
-
-              <div className="flex gap-2">
-                <button
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => p - 1)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Previous
-                </button>
-
-                <button
-                  disabled={page === totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Next
-                </button>
               </div>
             </div>
           </div>
@@ -432,42 +396,36 @@ export default function CrewApplications() {
           {showAddForm && (
             <CrewApplicationForm
               mode="add"
-              onClose={() => setShowAddForm(false)}
-              onSuccess={refreshCrews}
-            />
+              onClose={() => setShowAddForm(false)} onSuccess={function (): void {
+                throw new Error("Function not implemented.");
+              } }            />
           )}
 
-          {showEditForm && editCrew && (
-            <CrewApplicationForm
-              mode="edit"
-              crew={editCrew}
-              onClose={() => {
-                setShowEditForm(false);
-                setEditCrew(null);
-              }}
-              onSuccess={handleEditSuccess}
-            />
-          )}
+          {editCrew && (
+          <CrewApplicationForm
+            mode="edit"
+            crew={editCrew}
+            onClose={() => setEditCrew(null)}
+            onSuccess={() => {
+              setEditCrew(null);
+            }}
+          />
+        )}
 
-          {/* DELETE CONFIRMATION MODAL */}
           {showDeleteConfirm && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-2xl p-6 w-11/12 md:w-1/3 border">
-                <h2 className="text-lg font-bold mb-3">Delete Confirmation</h2>
-                <p className="text-gray-700 mb-6">
-                  Are you sure you want to delete this crew?
-                </p>
-
+              <div className="bg-white p-6 rounded-2xl">
+                <h2 className="font-bold mb-4">Delete Confirmation</h2>
                 <div className="flex justify-end gap-3">
                   <button
-                    className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
                     onClick={() => setShowDeleteConfirm(false)}
+                    className="px-4 py-2 bg-gray-200 rounded-lg"
                   >
                     No
                   </button>
                   <button
-                    className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
                     onClick={confirmDelete}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg"
                   >
                     Yes
                   </button>
@@ -475,7 +433,6 @@ export default function CrewApplications() {
               </div>
             </div>
           )}
-
         </div>
       </div>
     </ProtectedRoute>
