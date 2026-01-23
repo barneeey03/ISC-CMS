@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 
-import { CrewMember } from "@/app/lib/dataStore";
+import { CrewMember } from "@/app/lib/type";
 import {
   getCrewApplications,
   updateCrewInFirestore,

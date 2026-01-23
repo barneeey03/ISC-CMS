@@ -6,7 +6,7 @@ import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 
 import { FileText, Trash2, Search, Eye, X } from "lucide-react";
 
-import { CrewMember } from "@/app/lib/dataStore";
+import { CrewMember } from "@/app/lib/type";
 import { getCrewApplications, deleteCrewFromFirestore } from "@/app/lib/crewservice";
 
 export default function SuperAdminDisapprovedCrew() {
