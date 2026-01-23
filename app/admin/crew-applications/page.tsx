@@ -5,7 +5,7 @@ import { AdminSidebar } from "@/app/components/AdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 import { CrewApplicationForm } from "@/app/components/CrewApplicationForm";
 import { CrewDetailsModal } from "@/app/components/CrewDetailsModal";
-import { CrewMember } from "@/app/lib/dataStore";
+import { CrewMember } from "@/app/lib/type";
 
 import {
   Plus,
