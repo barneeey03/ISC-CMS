@@ -17,6 +17,7 @@ export type Certificate = {
 };
 
 export type VesselExperience = {
+  assignmentId: string;
   id: string;
   manningCompany: string;
   principal: string;

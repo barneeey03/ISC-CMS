@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { SuperAdminSidebar } from "@/app/components/SuperAdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
-import type { CrewMember } from "@/app/lib/dataStore";
+import type { CrewMember } from "@/app/lib/type";
 import {
   Search,
   Ship,
@@ -165,7 +165,9 @@ export default function VesselAssignment() {
 
     const avgDaysOnboard =
       completedDays.length > 0
-        ? Math.round(completedDays.reduce((a, b) => a + b, 0) / completedDays.length)
+        ? Math.round(
+            completedDays.reduce((a, b) => a + b, 0) / completedDays.length
+          )
         : 0;
 
     return {

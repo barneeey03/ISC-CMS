@@ -272,20 +272,15 @@ export function CrewDetailsModal({
                     </tr>
                   </thead>
                   <tbody>
-                    {crew.vesselExperience.map((v) => (
-                      <tr key={v.id}>
+                    {crew.vesselExperience.map((v, index) => (
+                      <tr key={v.id || v.assignmentId || index}>
                         <td className="border px-2 py-2 text-xs">{v.manningCompany}</td>
                         <td className="border px-2 py-2 text-xs">{v.principal}</td>
                         <td className="border px-2 py-2 text-xs">{v.rank}</td>
                         <td className="border px-2 py-2 text-xs">{v.vesselName}</td>
-                        <td className="border px-2 py-2 text-xs">{v.flag}</td>
                         <td className="border px-2 py-2 text-xs">{v.vesselType}</td>
-                        <td className="border px-2 py-2 text-xs">{v.grt}</td>
-                        <td className="border px-2 py-2 text-xs">{v.engineMaker}</td>
-                        <td className="border px-2 py-2 text-xs">{v.route}</td>
                         <td className="border px-2 py-2 text-xs">{v.signedOn}</td>
                         <td className="border px-2 py-2 text-xs">{v.signedOff}</td>
-                        <td className="border px-2 py-2 text-xs">{v.causeOfDischarge}</td>
                       </tr>
                     ))}
                   </tbody>
