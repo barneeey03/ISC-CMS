@@ -32,6 +32,7 @@ import {
   doc,
   updateDoc,
   deleteDoc,
+  setDoc,
 } from "firebase/firestore";
 
 import jsPDF from "jspdf";
@@ -48,6 +49,14 @@ type VesselAssignment = {
   signedOn: string;
   signedOff: string | null;
   rank: string;
+};
+
+type ConfirmModal = {
+  open: boolean;
+  type: "assign" | "unassign";
+  title: string;
+  message: string;
+  payload?: any;
 };
 
 export default function VesselAssignment() {
@@ -69,6 +78,14 @@ export default function VesselAssignment() {
   const [editAssignment, setEditAssignment] = useState<VesselAssignment | null>(
     null
   );
+
+  // CONFIRM MODAL STATE
+  const [confirmModal, setConfirmModal] = useState<ConfirmModal>({
+    open: false,
+    type: "assign",
+    title: "",
+    message: "",
+  });
 
   // SEARCH & FILTERS
   const [crewSearch, setCrewSearch] = useState("");
@@ -283,9 +300,68 @@ export default function VesselAssignment() {
     }
   };
 
-  // ===== Assign Vessel =====
-  const handleAssignVessel = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // ===== Helper to update correct vesselExperience entry =====
+  const updateCrewExperience = async (
+    crewId: string,
+    crewData: CrewMember,
+    newExperience: any,
+    assignmentId?: string
+  ) => {
+    const existingExperience = crewData.vesselExperience || [];
+
+    // If there is no experience, just add
+    if (existingExperience.length === 0) {
+      return [
+        {
+          ...newExperience,
+          experienceId: assignmentId || new Date().getTime().toString(),
+        },
+      ];
+    }
+
+    // If assignmentId exists, update matching entry
+    if (assignmentId) {
+      const updated = existingExperience.map((exp: any) => {
+        if (exp.experienceId === assignmentId) {
+          return { ...exp, ...newExperience };
+        }
+        return exp;
+      });
+
+      // If not found, add as new entry
+      const found = existingExperience.some(
+        (exp: any) => exp.experienceId === assignmentId
+      );
+
+      return found
+        ? updated
+        : [
+            ...existingExperience,
+            { ...newExperience, experienceId: assignmentId },
+          ];
+    }
+
+    // If no assignmentId, match by signedOn + vesselName
+    const foundIndex = existingExperience.findIndex(
+      (exp: any) =>
+        exp.vesselName === newExperience.vesselName &&
+        exp.signedOn === newExperience.signedOn
+    );
+
+    if (foundIndex !== -1) {
+      const updated = [...existingExperience];
+      updated[foundIndex] = { ...updated[foundIndex], ...newExperience };
+      return updated;
+    }
+
+    return [
+      ...existingExperience,
+      { ...newExperience, experienceId: new Date().getTime().toString() },
+    ];
+  };
+
+  // ===== ASSIGN VESSEL =====
+  const handleAssignVessel = async () => {
     if (!selectedCrew) return;
 
     if (!["approved", "proposed", "fooled"].includes(selectedCrew.status || "")) {
@@ -293,16 +369,35 @@ export default function VesselAssignment() {
       return;
     }
 
-    const vesselExperience = [
-      {
-        vesselName: transferData.vesselName,
-        vesselType: transferData.vesselType,
-        principal: transferData.principal,
-        signedOn: transferData.signedOn,
-        signedOff: transferData.signedOff || null,
-        rank: transferData.rank,
-      },
-    ];
+    const newExperienceEntry = {
+      vesselName: transferData.vesselName,
+      vesselType: transferData.vesselType,
+      principal: transferData.principal,
+      signedOn: transferData.signedOn,
+      signedOff: transferData.signedOff || null,
+      rank: transferData.rank,
+    };
+
+    // CREATE ASSIGNMENT DOC FIRST
+    const docRef = await addDoc(collection(db, "vesselAssignments"), {
+      crewId: selectedCrew.id,
+      crewName: selectedCrew.fullName,
+      vesselName: transferData.vesselName,
+      vesselType: transferData.vesselType,
+      principal: transferData.principal,
+      assignedDate: new Date().toISOString().split("T")[0],
+      signedOn: transferData.signedOn,
+      signedOff: transferData.signedOff || null,
+      rank: transferData.rank,
+    });
+
+    // THEN UPDATE CREW EXPERIENCE WITH ASSIGNMENT ID
+    const vesselExperience = await updateCrewExperience(
+      selectedCrew.id!,
+      selectedCrew,
+      newExperienceEntry,
+      docRef.id
+    );
 
     await updateCrewInFirestore(selectedCrew.id!, {
       vesselExperience,
@@ -322,18 +417,6 @@ export default function VesselAssignment() {
       status: "assigned",
     });
 
-    await addDoc(collection(db, "vesselAssignments"), {
-      crewId: selectedCrew.id,
-      crewName: selectedCrew.fullName,
-      vesselName: transferData.vesselName,
-      vesselType: transferData.vesselType,
-      principal: transferData.principal,
-      assignedDate: new Date().toISOString().split("T")[0],
-      signedOn: transferData.signedOn,
-      signedOff: transferData.signedOff || null,
-      rank: transferData.rank,
-    });
-
     alert("Crew successfully assigned to vessel!");
 
     setSelectedCrew(null);
@@ -351,15 +434,9 @@ export default function VesselAssignment() {
 
   // ===== UNASSIGN =====
   const handleUnassign = async (assignmentId: string, crewId: string) => {
-    const confirmUnassign = confirm(
-      "Are you sure you want to unassign this crew?"
-    );
-    if (!confirmUnassign) return;
-
     await deleteDoc(doc(db, "vesselAssignments", assignmentId));
 
     await updateCrewInFirestore(crewId, {
-      vesselExperience: [],
       vesselName: "",
       vesselType: "",
       principal: "",
@@ -368,7 +445,6 @@ export default function VesselAssignment() {
     });
 
     await updateCrewDatabaseInFirestore(crewId, {
-      vesselExperience: [],
       vesselName: "",
       vesselType: "",
       principal: "",
@@ -411,16 +487,21 @@ export default function VesselAssignment() {
       rank: transferData.rank,
     });
 
-    const vesselExperience = [
-      {
-        vesselName: transferData.vesselName,
-        vesselType: transferData.vesselType,
-        principal: transferData.principal,
-        signedOn: transferData.signedOn,
-        signedOff: transferData.signedOff || null,
-        rank: transferData.rank,
-      },
-    ];
+    const newExperienceEntry = {
+      vesselName: transferData.vesselName,
+      vesselType: transferData.vesselType,
+      principal: transferData.principal,
+      signedOn: transferData.signedOn,
+      signedOff: transferData.signedOff || null,
+      rank: transferData.rank,
+    };
+
+    const vesselExperience = await updateCrewExperience(
+      selectedCrew.id!,
+      selectedCrew,
+      newExperienceEntry,
+      editAssignment.id
+    );
 
     await updateCrewInFirestore(selectedCrew.id!, {
       vesselExperience,
@@ -616,7 +697,14 @@ export default function VesselAssignment() {
 
               <button
                 className="w-full bg-[#0B6FA4] text-white py-2 rounded-lg mt-4 hover:bg-[#085A8A] transition disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={() => setShowModal(true)}
+                onClick={() => {
+                  setConfirmModal({
+                    open: true,
+                    type: "assign",
+                    title: "Confirm Assign",
+                    message: "Are you sure you want to assign this crew to the vessel?",
+                  });
+                }}
                 disabled={!selectedCrew}
               >
                 Assign Vessel
@@ -831,7 +919,16 @@ export default function VesselAssignment() {
 
                             <button
                               className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition"
-                              onClick={() => handleUnassign(a.id!, a.crewId)}
+                              onClick={() =>
+                                setConfirmModal({
+                                  open: true,
+                                  type: "unassign",
+                                  title: "Confirm Unassign",
+                                  message:
+                                    "Are you sure you want to delete this assignment?",
+                                  payload: { assignmentId: a.id, crewId: a.crewId },
+                                })
+                              }
                               title="Unassign"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -897,7 +994,7 @@ export default function VesselAssignment() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  editAssignment ? handleUpdateAssignment() : handleAssignVessel(e);
+                  editAssignment ? handleUpdateAssignment() : handleAssignVessel();
                 }}
                 className="space-y-4"
               >
@@ -1038,6 +1135,52 @@ export default function VesselAssignment() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* ===== CONFIRM MODAL ===== */}
+        {confirmModal.open && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 w-11/12 md:w-1/3">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-bold">{confirmModal.title}</h2>
+                <button
+                  className="text-gray-600 hover:text-gray-800"
+                  onClick={() => setConfirmModal({ ...confirmModal, open: false })}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-gray-700 mb-6">{confirmModal.message}</p>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 transition"
+                  onClick={() => setConfirmModal({ ...confirmModal, open: false })}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  className="px-4 py-2 rounded-lg bg-[#0B6FA4] text-white hover:bg-[#085A8A] transition"
+                  onClick={async () => {
+                    setConfirmModal({ ...confirmModal, open: false });
+
+                    if (confirmModal.type === "assign") {
+                      setShowModal(true);
+                    }
+
+                    if (confirmModal.type === "unassign") {
+                      const { assignmentId, crewId } = confirmModal.payload;
+                      await handleUnassign(assignmentId, crewId);
+                    }
+                  }}
+                >
+                  Confirm
+                </button>
+              </div>
             </div>
           </div>
         )}
