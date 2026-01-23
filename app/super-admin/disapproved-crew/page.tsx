@@ -4,19 +4,10 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 import { SuperAdminSidebar } from "@/app/components/SuperAdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 
-import {
-  FileText,
-  Trash2,
-  Search,
-  Eye,
-  X,
-} from "lucide-react";
+import { FileText, Trash2, Search, Eye, X } from "lucide-react";
 
 import { CrewMember } from "@/app/lib/dataStore";
-import {
-  getCrewApplications,
-  deleteCrewFromFirestore,
-} from "@/app/lib/crewservice";
+import { getCrewApplications, deleteCrewFromFirestore } from "@/app/lib/crewservice";
 
 export default function SuperAdminDisapprovedCrew() {
   const [crews, setCrews] = useState<CrewMember[]>([]);
@@ -57,14 +48,10 @@ export default function SuperAdminDisapprovedCrew() {
     }
 
     if (dateFrom) {
-      filtered = filtered.filter(
-        (c) => new Date(c.dateApplied) >= new Date(dateFrom)
-      );
+      filtered = filtered.filter((c) => new Date(c.dateApplied) >= new Date(dateFrom));
     }
     if (dateTo) {
-      filtered = filtered.filter(
-        (c) => new Date(c.dateApplied) <= new Date(dateTo)
-      );
+      filtered = filtered.filter((c) => new Date(c.dateApplied) <= new Date(dateTo));
     }
 
     return filtered;
@@ -273,8 +260,41 @@ export default function SuperAdminDisapprovedCrew() {
                 </div>
 
                 <div className="overflow-auto max-h-[70vh] pr-2">
-                  {/* Same details UI */}
-                  ...
+                  {/* FULL DETAILS UI START */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Detail label="Full Name" value={selectedCrew.fullName} />
+                    <Detail label="Email" value={selectedCrew.emailAddress} />
+                    <Detail label="Age" value={selectedCrew.age} />
+                    <Detail label="Nationality" value={selectedCrew.nationality} />
+                    <Detail label="Phone" value={selectedCrew.phoneNumber} />
+                    <Detail label="Applied On" value={formatDate(selectedCrew.dateApplied)} />
+                    <Detail label="Status" value={selectedCrew.status} />
+                  </div>
+
+                  <div className="mt-4">
+                    <h3 className="font-bold text-[#002060] mb-2">Vessel Experience</h3>
+                    {selectedCrew.vesselExperience?.length > 0 ? (
+                      selectedCrew.vesselExperience.map((v: any, idx: number) => (
+                        <div key={idx} className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                          <Detail label="Vessel Name" value={v.vesselName} />
+                          <Detail label="Principal" value={v.principal} />
+                          <Detail label="Years" value={v.years} />
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-[#6B7B8A]">No vessel experience recorded.</p>
+                    )}
+                  </div>
+
+                  <div className="mt-4">
+                    <h3 className="font-bold text-[#002060] mb-2">Remarks</h3>
+                    <div className="rounded-lg p-3 bg-[#F9FBFD] border border-[#E0E8F0]">
+                      <p className="text-sm text-[#002060] mt-1">
+                        {selectedCrew.remarks || "No remarks."}
+                      </p>
+                    </div>
+                  </div>
+                  {/* FULL DETAILS UI END */}
                 </div>
 
                 <div className="flex justify-end gap-2 mt-4">

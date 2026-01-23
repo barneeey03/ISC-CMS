@@ -35,7 +35,6 @@ export default function SuperAdminCrewApplications() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<CrewStatus | "all">("all");
 
-  // Highlight dropdown
   const [highlightFilter, setHighlightFilter] = useState<
     "all" | "highlighted"
   >("all");
@@ -116,8 +115,21 @@ export default function SuperAdminCrewApplications() {
     );
   };
 
+  // ✅ NEW: Get Latest Vessel Experience
+  const getLatestVessel = (crew: CrewMember) => {
+    const vessels = crew.vesselExperience || [];
+
+    const sorted = [...vessels].sort((a, b) => {
+      const aDate = a.signedOn ? new Date(a.signedOn).getTime() : 0;
+      const bDate = b.signedOn ? new Date(b.signedOn).getTime() : 0;
+      return bDate - aDate;
+    });
+
+    return sorted[0];
+  };
+
   const getVesselInfo = (crew: CrewMember) => {
-    const lastVessel = crew.vesselExperience?.[0];
+    const lastVessel = getLatestVessel(crew);
 
     return {
       vesselType: lastVessel?.vesselType || crew.vesselType || "—",
@@ -129,7 +141,7 @@ export default function SuperAdminCrewApplications() {
   };
 
   const calculateDaysOnboard = (crew: CrewMember) => {
-    const last = crew.vesselExperience?.[0];
+    const last = getLatestVessel(crew);
     if (!last?.signedOn) return null;
 
     const start = new Date(last.signedOn).getTime();
@@ -273,7 +285,7 @@ export default function SuperAdminCrewApplications() {
                 </select>
               </div>
 
-              {/* NEW: HIGHLIGHT DROPDOWN */}
+              {/* HIGHLIGHT DROPDOWN */}
               <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg shadow-sm border">
                 <select
                   value={highlightFilter}
@@ -287,10 +299,8 @@ export default function SuperAdminCrewApplications() {
                 </select>
               </div>
 
-              {/* EMPTY SPACE */}
               <div className="hidden md:block" />
 
-              {/* EXPORT BUTTON (aligned right) */}
               <div className="flex justify-end">
                 <button
                   onClick={exportPDF}

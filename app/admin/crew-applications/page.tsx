@@ -123,8 +123,22 @@ export default function CrewApplications() {
     );
   };
 
+  // ✅ NEW: Get Latest Vessel Experience
+  const getLatestVessel = (crew: CrewMember) => {
+    const vessels = crew.vesselExperience || [];
+
+    const sorted = [...vessels].sort((a, b) => {
+      const aDate = a.signedOn ? new Date(a.signedOn).getTime() : 0;
+      const bDate = b.signedOn ? new Date(b.signedOn).getTime() : 0;
+      return bDate - aDate;
+    });
+
+    return sorted[0];
+  };
+
   const getVesselInfo = (crew: CrewMember) => {
-    const lastVessel = crew.vesselExperience?.[0];
+    const lastVessel = getLatestVessel(crew);
+
     return {
       vesselType: lastVessel?.vesselType || crew.vesselType || "—",
       vesselName: lastVessel?.vesselName || "—",
@@ -135,7 +149,7 @@ export default function CrewApplications() {
   };
 
   const calculateDaysOnboard = (crew: CrewMember) => {
-    const last = crew.vesselExperience?.[0];
+    const last = getLatestVessel(crew);
     if (!last?.signedOn) return null;
 
     const start = new Date(last.signedOn).getTime();
@@ -246,77 +260,77 @@ export default function CrewApplications() {
             </div>
           </div>
 
-        {/* CONTENT */}
-        <div className="pt-24 px-6 pb-10">
-          {/* CONTROLS */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
-            
-            {/* SEARCH BAR */}
-            <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg border shadow-sm h-12">
-              <Search className="w-4 h-4 text-gray-400" />
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search name, email, contact..."
-                className="w-full outline-none text-sm"
-              />
+          {/* CONTENT */}
+          <div className="pt-24 px-6 pb-10">
+            {/* CONTROLS */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+
+              {/* SEARCH BAR */}
+              <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg border shadow-sm h-12">
+                <Search className="w-4 h-4 text-gray-400" />
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search name, email, contact..."
+                  className="w-full outline-none text-sm"
+                />
+              </div>
+
+              {/* STATUS FILTER */}
+              <div className="flex items-center px-4 py-3 bg-white rounded-lg border shadow-sm h-12">
+                <select
+                  value={statusFilter}
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value as CrewStatus | "all")
+                  }
+                  className="w-full outline-none text-sm"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="proposed">Proposed</option>
+                  <option value="approved">Approved</option>
+                  <option value="disapproved">Disapproved</option>
+                  <option value="fooled">Fooled</option>
+                  <option value="assigned">Active</option>
+                </select>
+              </div>
+
+              {/* HIGHLIGHT FILTER */}
+              <div className="flex items-center px-4 py-3 bg-white rounded-lg border shadow-sm h-12">
+                <select
+                  value={highlightFilter}
+                  onChange={(e) =>
+                    setHighlightFilter(e.target.value as "all" | "highlighted")
+                  }
+                  className="w-full outline-none text-sm"
+                >
+                  <option value="all">All Crew</option>
+                  <option value="highlighted">Highlight {"<70 days"}</option>
+                </select>
+              </div>
+
+              {/* EMPTY SPACE */}
+              <div className="hidden md:block" />
+
+              {/* EXPORT + ADD CREW */}
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={exportPDF}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white rounded-lg h-12"
+                >
+                  <Download className="w-4 h-4" />
+                  Export PDF
+                </button>
+
+                <button
+                  onClick={() => setShowAddForm(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg h-12"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Crew
+                </button>
+              </div>
             </div>
-
-            {/* STATUS FILTER */}
-            <div className="flex items-center px-4 py-3 bg-white rounded-lg border shadow-sm h-12">
-              <select
-                value={statusFilter}
-                onChange={(e) =>
-                  setStatusFilter(e.target.value as CrewStatus | "all")
-                }
-                className="w-full outline-none text-sm"
-              >
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="proposed">Proposed</option>
-                <option value="approved">Approved</option>
-                <option value="disapproved">Disapproved</option>
-                <option value="fooled">Fooled</option>
-                <option value="assigned">Active</option>
-              </select>
-            </div>
-
-            {/* HIGHLIGHT FILTER */}
-            <div className="flex items-center px-4 py-3 bg-white rounded-lg border shadow-sm h-12">
-              <select
-                value={highlightFilter}
-                onChange={(e) =>
-                  setHighlightFilter(e.target.value as "all" | "highlighted")
-                }
-                className="w-full outline-none text-sm"
-              >
-                <option value="all">All Crew</option>
-                <option value="highlighted">Highlight {"<70 days"}</option>
-              </select>
-            </div>
-
-            {/* EMPTY SPACE */}
-            <div className="hidden md:block" />
-
-            {/* EXPORT + ADD CREW */}
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={exportPDF}
-                className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white rounded-lg h-12"
-              >
-                <Download className="w-4 h-4" />
-                Export PDF
-              </button>
-
-              <button
-                onClick={() => setShowAddForm(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg h-12"
-              >
-                <Plus className="w-4 h-4" />
-                Add Crew
-              </button>
-            </div>
-          </div>
 
             {/* TABLE */}
             <div className="bg-white rounded-xl shadow border overflow-hidden">

@@ -2,7 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
-import { dataStore, Certificate, CrewMember, VesselExperience } from "@/app/lib/dataStore";
+import {
+  dataStore,
+  Certificate,
+  CrewMember,
+  VesselExperience,
+} from "@/app/lib/dataStore";
 import { addCrewToFirestore, updateCrewInFirestore } from "@/app/lib/crewservice";
 import { serverTimestamp } from "firebase/firestore";
 
@@ -121,39 +126,39 @@ export function CrewApplicationForm({
         ...prev,
         ...crew,
         age: crew.age ? String(crew.age) : prev.age,
-        // Ensure vessel experience has proper unique IDs and all fields are strings
-        vesselExperience: crew.vesselExperience?.map((v, index) => ({
-          id: v.id || `vexp-${Date.now()}-${index}`,
-          manningCompany: v.manningCompany || "",
-          principal: v.principal || "",
-          rank: v.rank || "",
-          vesselName: v.vesselName || "",
-          flag: v.flag || "",
-          vesselType: v.vesselType || "",
-          grt: v.grt || "",
-          engineMaker: v.engineMaker || "",
-          trading: v.trading || "",
-          route: v.route || "",
-          signedOn: v.signedOn || "",
-          signedOff: v.signedOff || "",
-          causeOfDischarge: v.causeOfDischarge || "",
-        })) || [],
-        // Ensure certificates have proper unique IDs and all fields are strings
-        certificates: crew.certificates?.map((c, index) => ({
-          id: c.id || `cert-${Date.now()}-${index}`,
-          name: c.name || "",
-          number: c.number || "",
-          dateIssued: c.dateIssued || "",
-          validUntil: c.validUntil || "",
-        })) || [],
-        // Ensure documents have proper unique IDs and all fields are strings
-        documents: crew.documents?.map((d, index) => ({
-          id: d.id || `doc-${Date.now()}-${index}`,
-          name: d.name || "",
-          placeIssued: d.placeIssued || "",
-          dateIssued: d.dateIssued || "",
-          expiryDate: d.expiryDate || "",
-        })) || prev.documents,
+        vesselExperience:
+          crew.vesselExperience?.map((v, index) => ({
+            id: v.id || `vexp-${Date.now()}-${index}`,
+            manningCompany: v.manningCompany || "",
+            principal: v.principal || "",
+            rank: v.rank || "",
+            vesselName: v.vesselName || "",
+            flag: v.flag || "",
+            vesselType: v.vesselType || "",
+            grt: v.grt || "",
+            engineMaker: v.engineMaker || "",
+            trading: v.trading || "",
+            route: v.route || "",
+            signedOn: v.signedOn || "",
+            signedOff: v.signedOff || "",
+            causeOfDischarge: v.causeOfDischarge || "",
+          })) || [],
+        certificates:
+          crew.certificates?.map((c, index) => ({
+            id: c.id || `cert-${Date.now()}-${index}`,
+            name: c.name || "",
+            number: c.number || "",
+            dateIssued: c.dateIssued || "",
+            validUntil: c.validUntil || "",
+          })) || [],
+        documents:
+          crew.documents?.map((d, index) => ({
+            id: d.id || `doc-${Date.now()}-${index}`,
+            name: d.name || "",
+            placeIssued: d.placeIssued || "",
+            dateIssued: d.dateIssued || "",
+            expiryDate: d.expiryDate || "",
+          })) || prev.documents,
       }));
     }
   }, [mode, crew]);
@@ -169,7 +174,9 @@ export function CrewApplicationForm({
   };
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
   ) => {
     const { name, value } = e.target;
 
@@ -228,7 +235,7 @@ export function CrewApplicationForm({
   const removeDocument = (id: string) => {
     setFormData((prev) => ({
       ...prev,
-      documents: prev.documents.filter((d: { id: string; }) => d.id !== id),
+      documents: prev.documents.filter((d: { id: string }) => d.id !== id),
     }));
   };
 
@@ -239,7 +246,7 @@ export function CrewApplicationForm({
   ) => {
     setFormData((prev) => ({
       ...prev,
-      documents: prev.documents.map((d: { id: string; }) =>
+      documents: prev.documents.map((d: { id: string }) =>
         d.id === id ? { ...d, [field]: value } : d
       ),
     }));
@@ -248,14 +255,18 @@ export function CrewApplicationForm({
   const removeCertificate = (id: string) => {
     setFormData((prev) => ({
       ...prev,
-      certificates: prev.certificates.filter((c: { id: string; }) => c.id !== id),
+      certificates: prev.certificates.filter((c: { id: string }) => c.id !== id),
     }));
   };
 
-  const updateCertificate = (id: string, field: keyof Certificate, value: string) => {
+  const updateCertificate = (
+    id: string,
+    field: keyof Certificate,
+    value: string
+  ) => {
     setFormData((prev) => ({
       ...prev,
-      certificates: prev.certificates.map((c: { id: string; }) =>
+      certificates: prev.certificates.map((c: { id: string }) =>
         c.id === id ? { ...c, [field]: value } : c
       ),
     }));
@@ -289,7 +300,9 @@ export function CrewApplicationForm({
   const removeVesselExperience = (id: string) => {
     setFormData((prev) => ({
       ...prev,
-      vesselExperience: prev.vesselExperience.filter((v: { id: string; }) => v.id !== id),
+      vesselExperience: prev.vesselExperience.filter(
+        (v: { id: string }) => v.id !== id
+      ),
     }));
   };
 
@@ -300,18 +313,33 @@ export function CrewApplicationForm({
   ) => {
     setFormData((prev) => ({
       ...prev,
-      vesselExperience: prev.vesselExperience.map((v: { id: string; }) =>
+      vesselExperience: prev.vesselExperience.map((v: { id: string }) =>
         v.id === id ? { ...v, [field]: value } : v
       ),
     }));
   };
 
+  // 🔥 NEW: Sort Vessel Experience by signedOn DESC before saving
+  const sortVesselExperienceLatestFirst = (vessels: VesselExperience[]) => {
+    return [...vessels].sort((a, b) => {
+      const aDate = a.signedOn ? new Date(a.signedOn).getTime() : 0;
+      const bDate = b.signedOn ? new Date(b.signedOn).getTime() : 0;
+      return bDate - aDate;
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const sortedVesselExperience = sortVesselExperienceLatestFirst(
+      formData.vesselExperience
+    );
+
     const payload = {
       ...formData,
+      vesselExperience: sortedVesselExperience,
       age: Number(formData.age),
+      createdAt: serverTimestamp(),
     };
 
     try {
@@ -908,10 +936,17 @@ export function CrewApplicationForm({
 
           {/* ACTIONS */}
           <div className="flex gap-4 pt-4">
-            <button type="submit" className="flex-1 bg-[#0080C0] hover:bg-[#006BA0] text-white font-semibold rounded-lg py-3 transition">
+            <button
+              type="submit"
+              className="flex-1 bg-[#0080C0] hover:bg-[#006BA0] text-white font-semibold rounded-lg py-3 transition"
+            >
               {mode === "edit" ? "Update Crew Application" : "Submit Application"}
             </button>
-            <button type="button" onClick={onClose} className="flex-1 border border-[#D0E0F0] text-[#0080C0] font-semibold rounded-lg py-3 hover:bg-[#F9FBFD] transition">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 border border-[#D0E0F0] text-[#0080C0] font-semibold rounded-lg py-3 hover:bg-[#F9FBFD] transition"
+            >
               Cancel
             </button>
           </div>

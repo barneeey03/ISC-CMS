@@ -242,29 +242,38 @@ export default function VesselAssignment() {
     page * perPage
   );
 
-  const getCrewVesselInfo = (crew: CrewMember) => {
-    const vessel = crew.vesselExperience?.[0];
-    return {
-      vesselName: vessel?.vesselName || "—",
-      principal: vessel?.principal || "—",
-      vesselType: crew.vesselType || "—",
-      signedOn: vessel?.signedOn || "—",
-      signedOff: vessel?.signedOff || "—",
+    const getCrewVesselInfo = (crew: CrewMember) => {
+      const vesselExperience = crew.vesselExperience || [];
+
+      // Sort by signedOn date (latest first)
+      const latestVessel = vesselExperience
+        .slice()
+        .sort((a: any, b: any) => new Date(b.signedOn).getTime() - new Date(a.signedOn).getTime())[0];
+
+      return {
+        vesselName: latestVessel?.vesselName || "—",
+        principal: latestVessel?.principal || "—",
+        vesselType: latestVessel?.vesselType || crew.vesselType || "—",
+        signedOn: latestVessel?.signedOn || "—",
+        signedOff: latestVessel?.signedOff || "—",
+      };
     };
-  };
 
   const handleCrewSelect = (id: string) => {
     const crew = crews.find((c) => c.id === id) || null;
     setSelectedCrew(crew);
 
     if (crew) {
-      const vessel = crew.vesselExperience?.[0];
+      const latestVessel = (crew.vesselExperience || [])
+        .slice()
+        .sort((a: any, b: any) => new Date(b.signedOn).getTime() - new Date(a.signedOn).getTime())[0];
+
       setTransferData({
-        vesselName: crew.vesselName || "",
-        vesselType: crew.vesselType || "",
-        principal: crew.principal || "",
-        signedOn: vessel?.signedOn || new Date().toISOString().split("T")[0],
-        signedOff: vessel?.signedOff || "",
+        vesselName: latestVessel?.vesselName || crew.vesselName || "",
+        vesselType: latestVessel?.vesselType || crew.vesselType || "",
+        principal: latestVessel?.principal || crew.principal || "",
+        signedOn: latestVessel?.signedOn || new Date().toISOString().split("T")[0],
+        signedOff: latestVessel?.signedOff || "",
       });
     }
   };
@@ -462,7 +471,7 @@ export default function VesselAssignment() {
 
   return (
     <ProtectedRoute requiredRole="super-admin">
-      <div className="flex min-h-screen bg-gradient-to-b from-[#EAF4FF] to-[#FFFFFF]">
+      <div className="flex min-h-screen bg-linear-to-b from-[#EAF4FF] to-[#FFFFFF]">
         <SuperAdminSidebar />
 
         <div className="flex-1 min-h-screen lg:ml-64 p-6">
@@ -478,7 +487,7 @@ export default function VesselAssignment() {
 
           {/* Statistics Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-gradient-to-br from-[#0B6FA4] to-[#0B9DD6] text-white rounded-lg shadow-md p-6">
+            <div className="bg-linear-to-br from-[#0B6FA4] to-[#0B9DD6] text-white rounded-lg shadow-md p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-blue-100 text-sm font-medium">
@@ -497,7 +506,7 @@ export default function VesselAssignment() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-[#007A5C] to-[#00B18A] text-white rounded-lg shadow-md p-6">
+            <div className="bg-linear-to-br from-[#007A5C] to-[#00B18A] text-white rounded-lg shadow-md p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-green-100 text-sm font-medium">
@@ -514,7 +523,7 @@ export default function VesselAssignment() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-[#5A2D7C] to-[#9B4DFF] text-white rounded-lg shadow-md p-6">
+            <div className="bg-linear-to-br from-[#5A2D7C] to-[#9B4DFF] text-white rounded-lg shadow-md p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-purple-100 text-sm font-medium">
@@ -533,7 +542,7 @@ export default function VesselAssignment() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-[#FF7A00] to-[#FFB347] text-white rounded-lg shadow-md p-6">
+            <div className="bg-linear-to-br from-[#FF7A00] to-[#FFB347] text-white rounded-lg shadow-md p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-orange-100 text-sm font-medium">
@@ -707,7 +716,7 @@ export default function VesselAssignment() {
               </div>
 
               {/* Scrollable list */}
-              <div className="max-h-[520px] overflow-y-auto pr-2">
+              <div className="max-h-130 overflow-y-auto pr-2">
                 {paginatedAssignments.length === 0 ? (
                   <div className="text-center py-10 text-gray-500">
                     {filteredAssignments.length === 0 && vesselAssignments.length > 0
