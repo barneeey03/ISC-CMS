@@ -470,7 +470,7 @@ export default function VesselAssignment() {
         a.vesselType,
         a.principal,
         a.signedOn,
-        a.signedOff || "Still onboard",
+        a.signedOff || "",
         days,
         status,
       ];
@@ -808,7 +808,7 @@ export default function VesselAssignment() {
                             </p>
                             <p className="text-sm text-gray-700">
                               <span className="font-semibold">Signed Off:</span>{" "}
-                              {a.signedOff || "Still onboard"}
+                              {a.signedOff || ""}
                             </p>
                             <p className="text-sm text-gray-700">
                               <span className="font-semibold">Days Onboard:</span>{" "}
@@ -1012,7 +1012,7 @@ export default function VesselAssignment() {
                     className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[#0B6FA4]"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Leave empty if crew is still onboard
+                    Leave empty if crew is still onboard/no signed on
                   </p>
                 </div>
 
