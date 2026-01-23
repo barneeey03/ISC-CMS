@@ -70,7 +70,7 @@ export function SuperAdminSidebar() {
             </div>
             <div className="leading-tight">
               <h1 className="font-bold text-white text-sm">Super Admin</h1>
-              <p className="text-[10px] mt-1 text-gray-300">ISC Full System</p>
+              <p className="text-[10px] mt-1 text-gray-300">ISC Crewing & Recruitment</p>
             </div>
           </div>
         </div>
