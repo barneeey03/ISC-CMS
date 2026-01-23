@@ -116,14 +116,47 @@ export function CrewApplicationForm({
   });
 
   useEffect(() => {
-  if (mode === "edit" && crew) {
-    setFormData((prev) => ({
-      ...prev,
-      ...crew,
-      age: crew.age ? String(crew.age) : prev.age,
-    }));
-  }
-}, [mode, crew]);
+    if (mode === "edit" && crew) {
+      setFormData((prev) => ({
+        ...prev,
+        ...crew,
+        age: crew.age ? String(crew.age) : prev.age,
+        // Ensure vessel experience has proper unique IDs and all fields are strings
+        vesselExperience: crew.vesselExperience?.map((v, index) => ({
+          id: v.id || `vexp-${Date.now()}-${index}`,
+          manningCompany: v.manningCompany || "",
+          principal: v.principal || "",
+          rank: v.rank || "",
+          vesselName: v.vesselName || "",
+          flag: v.flag || "",
+          vesselType: v.vesselType || "",
+          grt: v.grt || "",
+          engineMaker: v.engineMaker || "",
+          trading: v.trading || "",
+          route: v.route || "",
+          signedOn: v.signedOn || "",
+          signedOff: v.signedOff || "",
+          causeOfDischarge: v.causeOfDischarge || "",
+        })) || [],
+        // Ensure certificates have proper unique IDs and all fields are strings
+        certificates: crew.certificates?.map((c, index) => ({
+          id: c.id || `cert-${Date.now()}-${index}`,
+          name: c.name || "",
+          number: c.number || "",
+          dateIssued: c.dateIssued || "",
+          validUntil: c.validUntil || "",
+        })) || [],
+        // Ensure documents have proper unique IDs and all fields are strings
+        documents: crew.documents?.map((d, index) => ({
+          id: d.id || `doc-${Date.now()}-${index}`,
+          name: d.name || "",
+          placeIssued: d.placeIssued || "",
+          dateIssued: d.dateIssued || "",
+          expiryDate: d.expiryDate || "",
+        })) || prev.documents,
+      }));
+    }
+  }, [mode, crew]);
 
   const calculateAge = (dob: string) => {
     if (!dob) return "";
@@ -166,7 +199,7 @@ export function CrewApplicationForm({
       certificates: [
         ...prev.certificates,
         {
-          id: `cert-${Date.now()}`,
+          id: `cert-${Date.now()}-${Math.random()}`,
           name: "",
           number: "",
           dateIssued: "",
@@ -182,7 +215,7 @@ export function CrewApplicationForm({
       documents: [
         ...prev.documents,
         {
-          id: `doc-${Date.now()}`,
+          id: `doc-${Date.now()}-${Math.random()}`,
           name: "",
           placeIssued: "",
           dateIssued: "",
@@ -234,7 +267,7 @@ export function CrewApplicationForm({
       vesselExperience: [
         ...prev.vesselExperience,
         {
-          id: `vexp-${Date.now()}`,
+          id: `vexp-${Date.now()}-${Math.random()}`,
           manningCompany: "",
           principal: "",
           rank: "",
@@ -273,28 +306,28 @@ export function CrewApplicationForm({
     }));
   };
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  const payload = {
-    ...formData,
-    age: Number(formData.age),
-  };
+    const payload = {
+      ...formData,
+      age: Number(formData.age),
+    };
 
-  try {
-    if (mode === "edit" && crew?.id) {
-      await updateCrewInFirestore(crew.id, payload);
-    } else {
-      await addCrewToFirestore(payload);
+    try {
+      if (mode === "edit" && crew?.id) {
+        await updateCrewInFirestore(crew.id, payload);
+      } else {
+        await addCrewToFirestore(payload);
+      }
+
+      onSuccess();
+      onClose();
+    } catch (error: any) {
+      console.error("Firestore Error:", error);
+      alert("Failed to submit: " + (error?.message || "Unknown error"));
     }
-
-    onSuccess();
-    onClose();
-  } catch (error: any) {
-    console.error("Firestore Error:", error);
-    alert("Failed to submit: " + (error?.message || "Unknown error"));
-  }
-};
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -574,7 +607,6 @@ const handleSubmit = async (e: React.FormEvent) => {
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Height */}
               <input
                 name="height"
                 value={formData.height}
@@ -585,7 +617,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                 min="0"
               />
 
-              {/* Weight */}
               <input
                 name="weight"
                 value={formData.weight}
@@ -596,7 +627,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                 min="0"
               />
 
-              {/* BMI */}
               <input
                 name="bmi"
                 value={formData.bmi}
@@ -606,7 +636,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                 type="text"
               />
 
-              {/* Ishihara Test */}
               <select
                 name="ishihara"
                 value={formData.ishihara}
@@ -636,7 +665,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
 
             <div className="space-y-3">
-              {formData.documents.map((doc: { id: string; name: string | number | readonly string[] | undefined; placeIssued: string | number | readonly string[] | undefined; dateIssued: string | number | readonly string[] | undefined; expiryDate: string | number | readonly string[] | undefined; }) => (
+              {formData.documents.map((doc: any) => (
                 <div
                   key={doc.id}
                   className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end"
@@ -711,7 +740,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
 
             <div className="space-y-3">
-              {formData.certificates.map((cert: { id: string; name: string | number | readonly string[] | undefined; number: string | number | readonly string[] | undefined; dateIssued: string | number | readonly string[] | undefined; validUntil: string | number | readonly string[] | undefined; }) => (
+              {formData.certificates.map((cert: any) => (
                 <div key={cert.id} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
                   <select
                     value={cert.name}
@@ -771,7 +800,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
 
             <div className="space-y-3">
-              {formData.vesselExperience.map((v: { id: string; manningCompany: string | number | readonly string[] | undefined; principal: string | number | readonly string[] | undefined; rank: string | number | readonly string[] | undefined; vesselName: string | number | readonly string[] | undefined; flag: string | number | readonly string[] | undefined; vesselType: string | number | readonly string[] | undefined; grt: string | number | readonly string[] | undefined; engineMaker: string | number | readonly string[] | undefined; trading: string | number | readonly string[] | undefined; route: string | number | readonly string[] | undefined; signedOn: string | number | readonly string[] | undefined; signedOff: string | number | readonly string[] | undefined; causeOfDischarge: string | number | readonly string[] | undefined; }) => (
+              {formData.vesselExperience.map((v: any) => (
                 <div key={v.id} className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <input
                     value={v.manningCompany}

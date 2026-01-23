@@ -98,6 +98,14 @@ export default function CrewApplications() {
     setShowEditForm(true);
   };
 
+  const handleEditSuccess = async () => {
+    await refreshCrews();
+    // If we're viewing this crew in the modal, close it so it refreshes
+    if (selectedCrew && editCrew && selectedCrew.id === editCrew.id) {
+      setSelectedCrew(null);
+    }
+  };
+
   const getAge = (dob?: string) => {
     if (!dob) return "—";
     const birth = new Date(dob);
@@ -109,9 +117,10 @@ export default function CrewApplications() {
     const lastVessel = crew.vesselExperience?.[0];
 
     return {
+      vesselType: lastVessel?.vesselType || crew.vesselType || "—",
       vesselName: lastVessel?.vesselName || "—",
       principal: lastVessel?.principal || "—",
-      signedOff: lastVessel?.signedOn || "—",
+      signedOff: lastVessel?.signedOff || "—",
     };
   };
 
@@ -151,7 +160,7 @@ export default function CrewApplications() {
       doc.setFontSize(11);
       doc.text(`${index + 1}. ${crew.fullName}`, 14, y);
       doc.text(`Rank: ${crew.presentRank}`, 14, y + 6);
-      doc.text(`Vessel Type: ${crew.vesselType}`, 14, y + 12);
+      doc.text(`Vessel Type: ${vessel.vesselType}`, 14, y + 12);
       doc.text(`Vessel Name: ${vessel.vesselName}`, 14, y + 18);
       doc.text(`Principal: ${vessel.principal}`, 14, y + 24);
       doc.text(`Signed Off: ${vessel.signedOff}`, 14, y + 30);
@@ -299,7 +308,7 @@ export default function CrewApplications() {
                             {crew.fullName}
                           </td>
                           <td className="px-3 py-2 text-center text-gray-600">
-                            {crew.vesselType}
+                            {vesselInfo.vesselType}
                           </td>
 
                           <td className="hidden md:table-cell px-3 py-2 text-center text-gray-600">
@@ -432,8 +441,11 @@ export default function CrewApplications() {
             <CrewApplicationForm
               mode="edit"
               crew={editCrew}
-              onClose={() => setShowEditForm(false)}
-              onSuccess={refreshCrews}
+              onClose={() => {
+                setShowEditForm(false);
+                setEditCrew(null);
+              }}
+              onSuccess={handleEditSuccess}
             />
           )}
 
