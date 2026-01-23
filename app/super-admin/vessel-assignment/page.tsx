@@ -47,6 +47,7 @@ type VesselAssignment = {
   assignedDate: string;
   signedOn: string;
   signedOff: string | null;
+  rank: string;
 };
 
 export default function VesselAssignment() {
@@ -59,6 +60,7 @@ export default function VesselAssignment() {
     principal: "",
     signedOn: new Date().toISOString().split("T")[0],
     signedOff: "",
+    rank: "",
   });
 
   const [vesselAssignments, setVesselAssignments] =
@@ -242,22 +244,22 @@ export default function VesselAssignment() {
     page * perPage
   );
 
-    const getCrewVesselInfo = (crew: CrewMember) => {
-      const vesselExperience = crew.vesselExperience || [];
+  const getCrewVesselInfo = (crew: CrewMember) => {
+    const vesselExperience = crew.vesselExperience || [];
 
-      // Sort by signedOn date (latest first)
-      const latestVessel = vesselExperience
-        .slice()
-        .sort((a: any, b: any) => new Date(b.signedOn).getTime() - new Date(a.signedOn).getTime())[0];
+    const latestVessel = vesselExperience
+      .slice()
+      .sort((a: any, b: any) => new Date(b.signedOn).getTime() - new Date(a.signedOn).getTime())[0];
 
-      return {
-        vesselName: latestVessel?.vesselName || "—",
-        principal: latestVessel?.principal || "—",
-        vesselType: latestVessel?.vesselType || crew.vesselType || "—",
-        signedOn: latestVessel?.signedOn || "—",
-        signedOff: latestVessel?.signedOff || "—",
-      };
+    return {
+      vesselName: latestVessel?.vesselName || "—",
+      principal: latestVessel?.principal || "—",
+      vesselType: latestVessel?.vesselType || crew.vesselType || "—",
+      signedOn: latestVessel?.signedOn || "—",
+      signedOff: latestVessel?.signedOff || "—",
+      rank: latestVessel?.rank || crew.presentRank || "—",
     };
+  };
 
   const handleCrewSelect = (id: string) => {
     const crew = crews.find((c) => c.id === id) || null;
@@ -274,6 +276,7 @@ export default function VesselAssignment() {
         principal: latestVessel?.principal || crew.principal || "",
         signedOn: latestVessel?.signedOn || new Date().toISOString().split("T")[0],
         signedOff: latestVessel?.signedOff || "",
+        rank: latestVessel?.rank || crew.presentRank || "",
       });
     }
   };
@@ -295,6 +298,7 @@ export default function VesselAssignment() {
         principal: transferData.principal,
         signedOn: transferData.signedOn,
         signedOff: transferData.signedOff || null,
+        rank: transferData.rank,
       },
     ];
 
@@ -303,6 +307,7 @@ export default function VesselAssignment() {
       vesselName: transferData.vesselName,
       vesselType: transferData.vesselType,
       principal: transferData.principal,
+      presentRank: transferData.rank,
       status: "assigned",
     });
 
@@ -311,6 +316,7 @@ export default function VesselAssignment() {
       vesselName: transferData.vesselName,
       vesselType: transferData.vesselType,
       principal: transferData.principal,
+      presentRank: transferData.rank,
       status: "assigned",
     });
 
@@ -323,6 +329,7 @@ export default function VesselAssignment() {
       assignedDate: new Date().toISOString().split("T")[0],
       signedOn: transferData.signedOn,
       signedOff: transferData.signedOff || null,
+      rank: transferData.rank,
     });
 
     alert("Crew successfully assigned to vessel!");
@@ -334,6 +341,7 @@ export default function VesselAssignment() {
       principal: "",
       signedOn: new Date().toISOString().split("T")[0],
       signedOff: "",
+      rank: "",
     });
     setCrewSearch("");
     setShowModal(false);
@@ -353,6 +361,7 @@ export default function VesselAssignment() {
       vesselName: "",
       vesselType: "",
       principal: "",
+      presentRank: "",
       status: "approved",
     });
 
@@ -361,6 +370,7 @@ export default function VesselAssignment() {
       vesselName: "",
       vesselType: "",
       principal: "",
+      presentRank: "",
       status: "approved",
     });
 
@@ -378,6 +388,7 @@ export default function VesselAssignment() {
       principal: assignment.principal,
       signedOn: assignment.signedOn,
       signedOff: assignment.signedOff || "",
+      rank: assignment.rank,
     });
 
     const crew = crews.find((c) => c.id === assignment.crewId) || null;
@@ -395,6 +406,7 @@ export default function VesselAssignment() {
       principal: transferData.principal,
       signedOn: transferData.signedOn,
       signedOff: transferData.signedOff || null,
+      rank: transferData.rank,
     });
 
     const vesselExperience = [
@@ -404,6 +416,7 @@ export default function VesselAssignment() {
         principal: transferData.principal,
         signedOn: transferData.signedOn,
         signedOff: transferData.signedOff || null,
+        rank: transferData.rank,
       },
     ];
 
@@ -412,6 +425,7 @@ export default function VesselAssignment() {
       vesselName: transferData.vesselName,
       vesselType: transferData.vesselType,
       principal: transferData.principal,
+      presentRank: transferData.rank,
     });
 
     await updateCrewDatabaseInFirestore(selectedCrew.id!, {
@@ -419,6 +433,7 @@ export default function VesselAssignment() {
       vesselName: transferData.vesselName,
       vesselType: transferData.vesselType,
       principal: transferData.principal,
+      presentRank: transferData.rank,
     });
 
     setEditAssignment(null);
@@ -434,6 +449,7 @@ export default function VesselAssignment() {
     const headers = [
       [
         "Crew Name",
+        "Rank",
         "Vessel Name",
         "Vessel Type",
         "Principal",
@@ -449,6 +465,7 @@ export default function VesselAssignment() {
       const status = a.signedOff ? "Completed" : "Active";
       return [
         a.crewName,
+        a.rank,
         a.vesselName,
         a.vesselType,
         a.principal,
@@ -627,6 +644,10 @@ export default function VesselAssignment() {
                             {info.principal}
                           </div>
                           <div className="text-sm text-gray-700">
+                            <span className="font-semibold">Rank:</span>{" "}
+                            {info.rank}
+                          </div>
+                          <div className="text-sm text-gray-700">
                             <span className="font-semibold">Signed On:</span>{" "}
                             {info.signedOn}
                           </div>
@@ -711,7 +732,6 @@ export default function VesselAssignment() {
                   onClick={() => setShowHighlightOnly(!showHighlightOnly)}
                 >
                   Highlight {"<70 days"}
-
                 </button>
               </div>
 
@@ -743,7 +763,7 @@ export default function VesselAssignment() {
                           <div className="flex justify-between items-start mb-2">
                             <div>
                               <p className="font-bold text-[#003366]">
-                                {a.crewName}
+                                {a.crewName} • {a.rank}
                               </p>
                               <span className="text-xs text-gray-500">
                                 Assigned: {a.assignedDate}
@@ -940,6 +960,25 @@ export default function VesselAssignment() {
                   />
                 </div>
 
+                {/* NEW FIELD: RANK */}
+                <div>
+                  <label className="block text-sm font-semibold text-[#003366] mb-1">
+                    Rank
+                  </label>
+                  <input
+                    value={transferData.rank}
+                    onChange={(e) =>
+                      setTransferData({
+                        ...transferData,
+                        rank: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[#0B6FA4]"
+                    placeholder="e.g., Chief Officer"
+                    required
+                  />
+                </div>
+
                 <div>
                   <label className="block text-sm font-semibold text-[#003366] mb-1">
                     Sign On Date
@@ -954,7 +993,6 @@ export default function VesselAssignment() {
                       })
                     }
                     className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[#0B6FA4]"
-                    required
                   />
                 </div>
 

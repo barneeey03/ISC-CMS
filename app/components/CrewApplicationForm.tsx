@@ -611,23 +611,6 @@ export function CrewApplicationForm({
             </div>
           </section>
 
-          {/* VESSEL TYPE */}
-          <section className="border border-[#E0E8F0] rounded-xl p-6">
-            <h3 className="text-lg font-bold text-[#0080C0] mb-5">
-              Vessel Type
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <input
-                name="vesselType"
-                value={formData.vesselType}
-                onChange={handleInputChange}
-                className={inputStyle}
-                placeholder="Vessel Type"
-              />
-            </div>
-          </section>
-
           {/* FOR OFFICE USE ONLY */}
           <section className="border border-[#E0E8F0] rounded-xl p-6 bg-[#F9FBFD]">
             <h3 className="text-lg font-bold text-[#0080C0] mb-5">
