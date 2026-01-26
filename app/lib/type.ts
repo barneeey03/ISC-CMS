@@ -3,7 +3,7 @@ export type CrewMemberStatus =
   | "proposed"
   | "approved"
   | "disapproved"
-  | "fooled"
+  | "pooled"
   | "assigned";
 
 export type Certificate = {

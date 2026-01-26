@@ -202,7 +202,7 @@ export default function VesselAssignment() {
       (c) =>
         c.status === "approved" ||
         c.status === "proposed" ||
-        c.status === "fooled"
+        c.status === "pooled"
     );
 
     if (!crewSearch.trim()) return filtered;
@@ -364,8 +364,8 @@ export default function VesselAssignment() {
   const handleAssignVessel = async () => {
     if (!selectedCrew) return;
 
-    if (!["approved", "proposed", "fooled"].includes(selectedCrew.status || "")) {
-      alert("Only approved/proposed/fooled crews can be assigned.");
+    if (!["approved", "proposed", "pooled"].includes(selectedCrew.status || "")) {
+      alert("Only approved/proposed/pooled crews can be assigned.");
       return;
     }
 

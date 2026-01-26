@@ -31,7 +31,7 @@ type CrewStatus =
   | "proposed"
   | "approved"
   | "disapproved"
-  | "fooled"
+  | "pooled"
   | "assigned";
 
 export default function CrewApplications() {
@@ -86,7 +86,7 @@ export default function CrewApplications() {
 
   const handleDisapprove = async (id: string, reconsider?: boolean) => {
     await updateCrewInFirestore(id, {
-      status: reconsider ? "fooled" : "disapproved",
+      status: reconsider ? "pooled" : "disapproved",
     });
     setSelectedCrew(null);
     setStatusFilter("all");
@@ -98,8 +98,8 @@ export default function CrewApplications() {
     setStatusFilter("all");
   };
 
-  const handleFooled = async (id: string) => {
-    await updateCrewInFirestore(id, { status: "fooled" });
+  const handlePooled = async (id: string) => {
+    await updateCrewInFirestore(id, { status: "pooled" });
     setSelectedCrew(null);
     setStatusFilter("all");
   };
@@ -288,7 +288,7 @@ export default function CrewApplications() {
                   <option value="proposed">Proposed</option>
                   <option value="approved">Approved</option>
                   <option value="disapproved">Disapproved</option>
-                  <option value="fooled">Fooled</option>
+                  <option value="pooled">Pooled</option>
                   <option value="assigned">Active</option>
                 </select>
               </div>
@@ -410,7 +410,7 @@ export default function CrewApplications() {
                                   ? "bg-orange-400 text-gray-900"
                                   : crew.status === "proposed"
                                   ? "bg-yellow-100 text-yellow-700"
-                                  : crew.status === "fooled"
+                                  : crew.status === "pooled"
                                   ? "bg-orange-100 text-orange-700"
                                   : "bg-red-100 text-red-700"
                               }`}
@@ -493,7 +493,7 @@ export default function CrewApplications() {
               onApprove={handleApprove}
               onDisapprove={handleDisapprove}
               onProposed={handleProposed}
-              onFooled={handleFooled}
+              onPooled={handlePooled}
             />
           )}
 

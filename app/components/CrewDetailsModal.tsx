@@ -10,14 +10,14 @@ export function CrewDetailsModal({
   onApprove,
   onDisapprove,
   onProposed,
-  onFooled,
+  onPooled,
 }: {
   crew: CrewMember;
   onClose: () => void;
   onApprove: (id: string) => void;
   onDisapprove: (id: string, reconsider?: boolean) => void;
   onProposed: (id: string) => void;
-  onFooled: (id: string) => void;
+  onPooled: (id: string) => void;
 }) {
   const [openSection, setOpenSection] = useState<string | null>("basic");
   const [showReconsider, setShowReconsider] = useState(false);
@@ -72,7 +72,7 @@ export function CrewDetailsModal({
                   onClick={() => onDisapprove(crew.id, true)}
                   className="px-4 py-2 rounded-lg bg-yellow-400 text-white font-semibold"
                 >
-                  Yes (Fooled)
+                  Yes (Pooled)
                 </button>
                 <button
                   onClick={() => onDisapprove(crew.id, false)}

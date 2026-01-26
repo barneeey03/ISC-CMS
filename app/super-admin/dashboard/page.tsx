@@ -39,7 +39,7 @@ const STATUS_STYLE: Record<string, { color: string; bg: string }> = {
   approved: { color: "#22C55E", bg: "#22C55E22" },
   pending: { color: "#F59E0B", bg: "#F59E0B22" },
   disapproved: { color: "#EF4444", bg: "#EF444422" },
-  fooled: { color: "#8B5CF6", bg: "#8B5CF622" },
+  pooled: { color: "#8B5CF6", bg: "#8B5CF622" },
   proposed: { color: "#0EA5E9", bg: "#0EA5E922" },
   assigned: { color: "#10B981", bg: "#10B98122" },
 };
@@ -129,7 +129,7 @@ export default function SuperAdminDashboard() {
   };
 
   const [statusFilter, setStatusFilter] =
-    useState<"all" | "approved" | "pending" | "disapproved" | "fooled" | "proposed" | "assigned">("all");
+    useState<"all" | "approved" | "pending" | "disapproved" | "pooled" | "proposed" | "assigned">("all");
 
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
@@ -189,7 +189,7 @@ export default function SuperAdminDashboard() {
   const total = filteredCrews.length;
   const approved = filteredCrews.filter((c) => c.status === "approved").length;
   const disapproved = filteredCrews.filter((c) => c.status === "disapproved").length;
-  const fooled = filteredCrews.filter((c) => c.status === "fooled").length;
+  const pooled = filteredCrews.filter((c) => c.status === "pooled").length;
   const proposed = filteredCrews.filter((c) => c.status === "proposed").length;
   const assigned = filteredCrews.filter((c) => c.status === "assigned").length;
 
@@ -322,7 +322,7 @@ export default function SuperAdminDashboard() {
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="disapproved">Disapproved</option>
-              <option value="fooled">Fooled</option>
+              <option value="pooled">Pooled</option>
               <option value="proposed">Proposed</option>
               <option value="assigned">Active Crews</option>
             </select>
@@ -364,7 +364,7 @@ export default function SuperAdminDashboard() {
             <StatCard title="Proposed" value={proposed} icon={<TrendingUp />} />
             <StatCard title="Approved" value={approved} icon={<FileCheck />} />
             <StatCard title="Disapproved" value={disapproved} icon={<XCircle />} />
-            <StatCard title="Fooled" value={fooled} icon={<XCircle />} />
+            <StatCard title="Pooled" value={pooled} icon={<XCircle />} />
             <StatCard title="Active Crews" value={assigned} icon={<Users />} />
           </div>
 
@@ -393,7 +393,7 @@ export default function SuperAdminDashboard() {
                       { name: "Approved", value: approved },
                       { name: "Proposed", value: proposed },
                       { name: "Disapproved", value: disapproved },
-                      { name: "Fooled", value: fooled },
+                      { name: "Pooled", value: pooled },
                       { name: "Active Crews", value: assigned }
                     ]}
                     dataKey="value"

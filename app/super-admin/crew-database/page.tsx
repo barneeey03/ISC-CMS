@@ -20,7 +20,7 @@ export default function CrewDatabase() {
   const [filterRank, setFilterRank] = useState("");
   const [filterVessel, setFilterVessel] = useState("");
   const [filterStatus, setFilterStatus] = useState<
-    "all" | "approved" | "pending" | "disapproved" | "proposed" | "fooled" | "active"
+    "all" | "approved" | "pending" | "disapproved" | "proposed" | "pooled" | "active"
   >("all");
 
   const [sortKey, setSortKey] = useState<keyof CrewType>("fullName");
@@ -252,7 +252,7 @@ export default function CrewDatabase() {
                   <option value="pending">Pending</option>
                   <option value="proposed">Proposed</option>
                   <option value="disapproved">Disapproved</option>
-                  <option value="fooled">Fooled</option>
+                  <option value="pooled">Pooled</option>
                   <option value="active">Active</option>
                 </select>
               </div>
@@ -335,7 +335,7 @@ export default function CrewDatabase() {
                                     ? "bg-[#8B5CF6] text-white"
                                     : status === "active"
                                       ? "bg-[#22C55E] text-white" // ACTIVE green
-                                      : status === "fooled"
+                                      : status === "pooled"
                                         ? "bg-[#0EA5E9] text-white"
                                         : "bg-[#EF4444] text-white"
                             }`}

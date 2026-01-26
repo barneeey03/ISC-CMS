@@ -34,7 +34,7 @@ import { listenCrewApplications } from "@/app/lib/crewservice";
 /* =======================
    TYPES
 ======================= */
-type CrewStatus = "all" | "approved" | "proposed" | "disapproved" | "fooled" | "assigned";
+type CrewStatus = "all" | "approved" | "proposed" | "disapproved" | "pooled" | "assigned";
 
 /* =======================
    CONSTANTS
@@ -159,7 +159,7 @@ export default function AdminDashboard() {
   const approvedCount = filteredCrews.filter((c) => c.status === "approved").length;
   const proposedCount = filteredCrews.filter((c) => c.status === "proposed").length;
   const disapprovedCount = filteredCrews.filter((c) => c.status === "disapproved").length;
-  const fooledCount = filteredCrews.filter((c) => c.status === "fooled").length;
+  const pooledCount = filteredCrews.filter((c) => c.status === "pooled").length;
   const assignedCount = filteredCrews.filter((c) => c.status === "assigned").length;
 
   /* =======================
@@ -180,7 +180,7 @@ export default function AdminDashboard() {
     { name: "Proposed", value: proposedCount },
     { name: "Active", value: assignedCount },
     { name: "Disapproved", value: disapprovedCount },
-    { name: "Fooled", value: fooledCount },
+    { name: "Pooled", value: pooledCount },
   ];
 
   /* =======================
@@ -237,7 +237,7 @@ export default function AdminDashboard() {
                   <option value="proposed">Proposed</option>
                   <option value="assigned">Active</option>
                   <option value="disapproved">Disapproved</option>
-                  <option value="fooled">Fooled</option>
+                  <option value="pooled">Pooled</option>
                 </select>
 
                 <input type="date" className="border rounded-xl p-3" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
@@ -271,7 +271,7 @@ export default function AdminDashboard() {
 
                 { label: "Active", value: assignedCount, status: "assigned", icon: Activity, color: "text-green-500" },
                 { label: "Disapproved", value: disapprovedCount, status: "disapproved", icon: XCircle, color: "text-red-500" },
-                { label: "Fooled", value: fooledCount, status: "fooled", icon: Activity, color: "text-purple-500" },
+                { label: "Pooled", value: pooledCount, status: "pooled", icon: Activity, color: "text-purple-500" },
               ].map((s) => {
                 const isActive = statusFilter === s.status || (s.status === "all" && statusFilter === "all");
                 return (
