@@ -351,7 +351,7 @@ export default function SuperAdminDashboard() {
 
               <button
                 onClick={exportPDF}
-                className="ml-3 h-10 flex items-center gap-2 px-4 rounded border bg-linear-to-r from-red-600 to-red-600 text-white text-sm hover:from-red-700 hover:to-red-700 transition"
+                className="ml-3 h-10 flex items-center gap-2 px-4 rounded border bg-linear-to-r from-blue-900 to-blue-900 text-white text-sm hover:from-blue-800 hover:to-blue-800 transition"
               >
                 <Download className="w-4 h-4" /> Export PDF
               </button>

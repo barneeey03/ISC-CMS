@@ -192,7 +192,7 @@ export default function CrewDatabase() {
           <div className="flex justify-end mt-4 px-6 gap-3">
             <button
               onClick={exportPDF}
-              className="flex items-center gap-2 px-5 py-2 rounded-lg bg-[#d50000] text-white text-sm hover:bg-[#f83030] transition"
+              className="flex items-center gap-2 px-5 py-2 bg-[#005B96] text-white rounded-lg shadow-sm hover:bg-blue-800 transition"
             >
               <FileText className="w-4 h-4" />
               Export PDF
@@ -200,7 +200,7 @@ export default function CrewDatabase() {
 
             <button
               onClick={exportExcel}
-              className="flex items-center gap-2 px-5 py-2 rounded-lg bg-[#00a033] text-white text-sm hover:bg-[#03cc00] transition"
+              className="flex items-center gap-2 px-5 py-2 rounded-lg bg-[#006c22] text-white text-sm hover:bg-[#039d00] transition"
             >
               <Download className="w-4 h-4" />
               Export Excel
