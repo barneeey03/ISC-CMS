@@ -112,7 +112,7 @@ export default function CrewApplications() {
   };
 
   /* ============================
-     HELPERS
+     HELPERS (SYNCED WITH SUPER ADMIN)
   ============================ */
   const getAge = (dob?: string) => {
     if (!dob) return "—";
@@ -123,7 +123,6 @@ export default function CrewApplications() {
     );
   };
 
-  // ✅ NEW: Get Latest Vessel Experience
   const getLatestVessel = (crew: CrewMember) => {
     const vessels = crew.vesselExperience || [];
 
@@ -193,7 +192,7 @@ export default function CrewApplications() {
   );
 
   /* ============================
-     PDF EXPORT
+     PDF EXPORT (SAME AS SUPER ADMIN)
   ============================ */
   const exportPDF = () => {
     const doc = new jsPDF();
@@ -264,7 +263,6 @@ export default function CrewApplications() {
           <div className="pt-24 px-6 pb-10">
             {/* CONTROLS */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
-
               {/* SEARCH BAR */}
               <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg border shadow-sm h-12">
                 <Search className="w-4 h-4 text-gray-400" />

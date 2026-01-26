@@ -17,8 +17,8 @@ export type Certificate = {
 };
 
 export type VesselExperience = {
-  assignmentId: string;
   id: string;
+  assignmentId?: string;
   manningCompany: string;
   principal: string;
   rank: string;
@@ -26,74 +26,84 @@ export type VesselExperience = {
   flag: string;
   vesselType: string;
   grt: string;
-  engineMaker: string;
-  trading: string;
-  route: string;
+  mainEngine: string;
+  tradingRoute: string;
   signedOn: string;
   signedOff: string;
   causeOfDischarge: string;
 };
 
 export interface CrewMember {
-  rank: string;
+  // System fields
   id: string;
   createdAt: string;
+  status: CrewMemberStatus;
 
+  // Application Information
   dateApplied: string;
   presentRank: string;
   prevSalary: string;
-  province: string;
+  province: string; // Position Applied For
   dateOfAvailability: string;
   expectedSalary: string;
-  placeOfBirth: string;
-  numOfChildren: string;
-  religion: string;
-  nextOfKin: string;
-  nextOfKinAddress: string;
-  schoolAttended: string;
-  weight: string;
-  course: string;
-  yearGraduated: string;
-  bmi: string;
-  ishihara: string;
 
-  certificates: Certificate[];
-  vesselExperience: VesselExperience[];
-
+  // Personal Details
   fullName: string;
-  fathersName: string;
-  mothersName: string;
   dateOfBirth: string;
   age: number;
-  nationality: string;
+  placeOfBirth: string;
   gender: string;
-  height: string;
-  uniformSize: string;
   civilStatus: string;
-
+  nationality: string;
   mobileNumber: string;
   emailAddress: string;
   completeAddress: string;
+  numOfChildren: string;
+  religion: string;
+  uniformSize: string;
 
+  // Family Information
+  fathersName: string;
+  mothersName: string;
+  nextOfKin: string;
+  nextOfKinAddress: string;
+
+  // Education
+  schoolAttended: string;
+  course: string;
+  yearGraduated: string;
   highSchool: {
     schoolName: string;
     yearGraduated: string;
   };
-
   college: {
     schoolName: string;
     course: string;
     yearGraduated: string;
   };
 
+  // Office Use Only
+  height: string;
+  weight: string;
+  bmi: string;
+  ishihara: string;
+
+  // Documents
   documents: {
     id: string;
     name: string;
-    placeIssued: string;
+    placeIssued: string; // Document No.
     dateIssued: string;
     expiryDate: string;
   }[];
 
+  // Certificates
+  certificates: Certificate[];
+
+  // Vessel Experience
+  vesselExperience: VesselExperience[];
+
+  // Sea Service (if different from vessel experience)
   seaService: {
     id: string;
     rankServed: string;
@@ -105,6 +115,7 @@ export interface CrewMember {
     duration: string;
   }[];
 
+  // Medical
   medical: {
     certificateType: string;
     issuingClinic: string;
@@ -112,14 +123,14 @@ export interface CrewMember {
     expiryDate: string;
   };
 
+  // Additional fields
+  rank: string;
   vesselType: string;
+  remarks: string;
 
-  // ✅ NEW FIELDS
+  // Legacy/optional fields
   vesselExperienceId?: string;
   vesselName?: string;
   principal?: string;
   expiryDate?: string;
-
-  status: CrewMemberStatus;
-  remarks: string;
 }

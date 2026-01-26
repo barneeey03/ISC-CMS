@@ -3,15 +3,14 @@
 import React, { useEffect, useState } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
 import {
-  dataStore,
   Certificate,
   CrewMember,
   VesselExperience,
-} from "@/app/lib/dataStore";
+} from "@/app/lib/type";
 import { addCrewToFirestore, updateCrewInFirestore } from "@/app/lib/crewservice";
 import { serverTimestamp } from "firebase/firestore";
 
-type CrewFormData = Omit<CrewMember, "id" | "createdAt"> & {
+type CrewFormData = Omit<CrewMember, "id" | "createdAt" | "age"> & {
   age: string;
 };
 
@@ -61,45 +60,52 @@ export function CrewApplicationForm({
   crew,
 }: CrewApplicationFormProps) {
   const [formData, setFormData] = useState<CrewFormData>({
+    // System fields
+    status: "pending",
+
+    // Application Information
     dateApplied: "",
     presentRank: "",
     prevSalary: "",
     province: "",
     dateOfAvailability: "",
     expectedSalary: "",
-    placeOfBirth: "",
-    numOfChildren: "",
-    religion: "",
-    nextOfKin: "",
-    nextOfKinAddress: "",
-    schoolAttended: "",
-    weight: "",
-    course: "",
-    yearGraduated: "",
-    bmi: "",
-    ishihara: "",
 
-    certificates: [],
-    vesselExperience: [],
-
+    // Personal Details
     fullName: "",
-    fathersName: "",
-    mothersName: "",
     dateOfBirth: "",
     age: "",
-    nationality: "",
+    placeOfBirth: "",
     gender: "",
-    height: "",
-    uniformSize: "",
     civilStatus: "",
-
+    nationality: "",
     mobileNumber: "",
     emailAddress: "",
     completeAddress: "",
+    numOfChildren: "",
+    religion: "",
+    uniformSize: "",
 
+    // Family Information
+    fathersName: "",
+    mothersName: "",
+    nextOfKin: "",
+    nextOfKinAddress: "",
+
+    // Education
+    schoolAttended: "",
+    course: "",
+    yearGraduated: "",
     highSchool: { schoolName: "", yearGraduated: "" },
     college: { schoolName: "", course: "", yearGraduated: "" },
 
+    // Office Use Only
+    height: "",
+    weight: "",
+    bmi: "",
+    ishihara: "",
+
+    // Documents
     documents: [
       {
         id: `doc-${Date.now()}`,
@@ -110,13 +116,26 @@ export function CrewApplicationForm({
       },
     ],
 
+    // Certificates
+    certificates: [],
+
+    // Vessel Experience
+    vesselExperience: [],
+
+    // Sea Service
     seaService: [],
-    medical: { certificateType: "", issuingClinic: "", dateIssued: "", expiryDate: "" },
 
-    vesselType: "",
-    status: "pending",
+    // Medical
+    medical: {
+      certificateType: "",
+      issuingClinic: "",
+      dateIssued: "",
+      expiryDate: "",
+    },
 
+    // Additional fields
     rank: "",
+    vesselType: "",
     remarks: "",
   });
 
@@ -125,10 +144,12 @@ export function CrewApplicationForm({
       setFormData((prev) => ({
         ...prev,
         ...crew,
-        age: crew.age ? String(crew.age) : prev.age,
+        age: crew.age ? String(crew.age) : "",
+
         vesselExperience:
           crew.vesselExperience?.map((v, index) => ({
             id: v.id || `vexp-${Date.now()}-${index}`,
+            assignmentId: v.assignmentId || "",
             manningCompany: v.manningCompany || "",
             principal: v.principal || "",
             rank: v.rank || "",
@@ -136,21 +157,24 @@ export function CrewApplicationForm({
             flag: v.flag || "",
             vesselType: v.vesselType || "",
             grt: v.grt || "",
-            engineMaker: v.engineMaker || "",
-            trading: v.trading || "",
-            route: v.route || "",
+            mainEngine: v.mainEngine || "",
+            tradingRoute: v.tradingRoute || "",
             signedOn: v.signedOn || "",
             signedOff: v.signedOff || "",
             causeOfDischarge: v.causeOfDischarge || "",
           })) || [],
+
         certificates:
           crew.certificates?.map((c, index) => ({
             id: c.id || `cert-${Date.now()}-${index}`,
             name: c.name || "",
             number: c.number || "",
+            placeIssued: c.placeIssued || "",
+            trainingCenter: c.trainingCenter || "",
             dateIssued: c.dateIssued || "",
             validUntil: c.validUntil || "",
           })) || [],
+
         documents:
           crew.documents?.map((d, index) => ({
             id: d.id || `doc-${Date.now()}-${index}`,
@@ -159,6 +183,11 @@ export function CrewApplicationForm({
             dateIssued: d.dateIssued || "",
             expiryDate: d.expiryDate || "",
           })) || prev.documents,
+
+        highSchool: crew.highSchool || prev.highSchool,
+        college: crew.college || prev.college,
+        medical: crew.medical || prev.medical,
+        seaService: crew.seaService || prev.seaService,
       }));
     }
   }, [mode, crew]);
@@ -200,6 +229,7 @@ export function CrewApplicationForm({
     }
   };
 
+  // Certificate Functions
   const addCertificate = () => {
     setFormData((prev) => ({
       ...prev,
@@ -209,6 +239,8 @@ export function CrewApplicationForm({
           id: `cert-${Date.now()}-${Math.random()}`,
           name: "",
           number: "",
+          placeIssued: "",
+          trainingCenter: "",
           dateIssued: "",
           validUntil: "",
         },
@@ -216,6 +248,27 @@ export function CrewApplicationForm({
     }));
   };
 
+  const removeCertificate = (id: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      certificates: prev.certificates.filter((c) => c.id !== id),
+    }));
+  };
+
+  const updateCertificate = (
+    id: string,
+    field: keyof Certificate,
+    value: string
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      certificates: prev.certificates.map((c) =>
+        c.id === id ? { ...c, [field]: value } : c
+      ),
+    }));
+  };
+
+  // Document Functions
   const addDocument = () => {
     setFormData((prev) => ({
       ...prev,
@@ -235,7 +288,7 @@ export function CrewApplicationForm({
   const removeDocument = (id: string) => {
     setFormData((prev) => ({
       ...prev,
-      documents: prev.documents.filter((d: { id: string }) => d.id !== id),
+      documents: prev.documents.filter((d) => d.id !== id),
     }));
   };
 
@@ -246,32 +299,13 @@ export function CrewApplicationForm({
   ) => {
     setFormData((prev) => ({
       ...prev,
-      documents: prev.documents.map((d: { id: string }) =>
+      documents: prev.documents.map((d) =>
         d.id === id ? { ...d, [field]: value } : d
       ),
     }));
   };
 
-  const removeCertificate = (id: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      certificates: prev.certificates.filter((c: { id: string }) => c.id !== id),
-    }));
-  };
-
-  const updateCertificate = (
-    id: string,
-    field: keyof Certificate,
-    value: string
-  ) => {
-    setFormData((prev) => ({
-      ...prev,
-      certificates: prev.certificates.map((c: { id: string }) =>
-        c.id === id ? { ...c, [field]: value } : c
-      ),
-    }));
-  };
-
+  // Vessel Experience Functions
   const addVesselExperience = () => {
     setFormData((prev) => ({
       ...prev,
@@ -279,6 +313,7 @@ export function CrewApplicationForm({
         ...prev.vesselExperience,
         {
           id: `vexp-${Date.now()}-${Math.random()}`,
+          assignmentId: "",
           manningCompany: "",
           principal: "",
           rank: "",
@@ -286,9 +321,8 @@ export function CrewApplicationForm({
           flag: "",
           vesselType: "",
           grt: "",
-          engineMaker: "",
-          trading: "",
-          route: "",
+          mainEngine: "",
+          tradingRoute: "",
           signedOn: "",
           signedOff: "",
           causeOfDischarge: "",
@@ -300,9 +334,7 @@ export function CrewApplicationForm({
   const removeVesselExperience = (id: string) => {
     setFormData((prev) => ({
       ...prev,
-      vesselExperience: prev.vesselExperience.filter(
-        (v: { id: string }) => v.id !== id
-      ),
+      vesselExperience: prev.vesselExperience.filter((v) => v.id !== id),
     }));
   };
 
@@ -313,13 +345,13 @@ export function CrewApplicationForm({
   ) => {
     setFormData((prev) => ({
       ...prev,
-      vesselExperience: prev.vesselExperience.map((v: { id: string }) =>
+      vesselExperience: prev.vesselExperience.map((v) =>
         v.id === id ? { ...v, [field]: value } : v
       ),
     }));
   };
 
-  // 🔥 NEW: Sort Vessel Experience by signedOn DESC before saving
+  // Sort Vessel Experience by signedOn DESC before saving
   const sortVesselExperienceLatestFirst = (vessels: VesselExperience[]) => {
     return [...vessels].sort((a, b) => {
       const aDate = a.signedOn ? new Date(a.signedOn).getTime() : 0;
@@ -370,7 +402,7 @@ export function CrewApplicationForm({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-8">
-          {/* BASIC INFO */}
+          {/* APPLICATION INFORMATION */}
           <section className="border border-[#E0E8F0] rounded-xl p-6">
             <h3 className="text-lg font-bold text-[#0080C0] mb-5">
               Application Information
@@ -435,7 +467,7 @@ export function CrewApplicationForm({
             </div>
           </section>
 
-          {/* PERSONAL */}
+          {/* PERSONAL DETAILS */}
           <section className="border border-[#E0E8F0] rounded-xl p-6">
             <h3 className="text-lg font-bold text-[#0080C0] mb-5">
               Personal Details
@@ -669,14 +701,14 @@ export function CrewApplicationForm({
               <button
                 type="button"
                 onClick={addDocument}
-                className="flex items-center gap-2 bg-[#0080C0] text-white px-4 py-2 rounded-lg"
+                className="flex items-center gap-2 bg-[#0080C0] text-white px-4 py-2 rounded-lg hover:bg-[#006BA0] transition"
               >
                 <Plus className="w-4 h-4" /> Add Document
               </button>
             </div>
 
             <div className="space-y-3">
-              {formData.documents.map((doc: any) => (
+              {formData.documents.map((doc) => (
                 <div
                   key={doc.id}
                   className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end"
@@ -726,7 +758,7 @@ export function CrewApplicationForm({
                   <button
                     type="button"
                     onClick={() => removeDocument(doc.id)}
-                    className="flex items-center justify-center border border-[#D0E0F0] rounded-lg p-2 hover:bg-[#F9FBFD]"
+                    className="flex items-center justify-center border border-[#D0E0F0] rounded-lg p-2 hover:bg-[#F9FBFD] transition"
                   >
                     <Trash2 className="w-4 h-4 text-[#FF0000]" />
                   </button>
@@ -736,199 +768,221 @@ export function CrewApplicationForm({
           </section>
 
           {/* CERTIFICATES */}
-          <section className="border rounded-xl p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-[#0080C0]">Certificates</h3>
+          <section className="border border-[#E0E8F0] rounded-xl p-6">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-lg font-bold text-[#0080C0]">Certificates</h3>
               <button
                 type="button"
                 onClick={addCertificate}
-                className="flex items-center gap-2 bg-[#0080C0] text-white px-4 py-2 rounded-lg"
+                className="flex items-center gap-2 bg-[#0080C0] text-white px-4 py-2 rounded-lg hover:bg-[#006BA0] transition"
               >
-                <Plus size={16} /> Add Certificate
+                <Plus className="w-4 h-4" /> Add Certificate
               </button>
             </div>
 
             <div className="space-y-3">
-                {formData.certificates.map((cert: Certificate) => (
+              {formData.certificates.map((cert) => (
                 <div
                   key={cert.id}
                   className="grid grid-cols-1 md:grid-cols-7 gap-3 items-end"
                 >
                   <select
-                  value={cert.name}
-                  onChange={(e) =>
-                    updateCertificate(cert.id, "name", e.target.value)
-                  }
-                  className={inputStyle}
+                    value={cert.name}
+                    onChange={(e) =>
+                      updateCertificate(cert.id, "name", e.target.value)
+                    }
+                    className={inputStyle}
                   >
-                  <option value="">Certificate</option>
-                  {CERTIFICATES.map((c) => (
-                    <option key={c} value={c}>
-                    {c}
-                    </option>
-                  ))}
+                    <option value="">Certificate</option>
+                    {CERTIFICATES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
                   </select>
 
                   <input
-                  className={inputStyle}
-                  placeholder="Certificate No."
-                  value={cert.number}
-                  onChange={(e) =>
-                    updateCertificate(cert.id, "number", e.target.value)
-                  }
+                    className={inputStyle}
+                    placeholder="Certificate No."
+                    value={cert.number}
+                    onChange={(e) =>
+                      updateCertificate(cert.id, "number", e.target.value)
+                    }
                   />
 
                   <input
-                  className={inputStyle}
-                  placeholder="Place Issued"
-                  value={cert.placeIssued}
-                  onChange={(e) =>
-                    updateCertificate(cert.id, "placeIssued", e.target.value)
-                  }
+                    className={inputStyle}
+                    placeholder="Place Issued"
+                    value={cert.placeIssued}
+                    onChange={(e) =>
+                      updateCertificate(cert.id, "placeIssued", e.target.value)
+                    }
                   />
 
                   <input
-                  className={inputStyle}
-                  placeholder="Training Center"
-                  value={cert.trainingCenter}
-                  onChange={(e) =>
-                    updateCertificate(cert.id, "trainingCenter", e.target.value)
-                  }
+                    className={inputStyle}
+                    placeholder="Training Center"
+                    value={cert.trainingCenter}
+                    onChange={(e) =>
+                      updateCertificate(cert.id, "trainingCenter", e.target.value)
+                    }
                   />
 
                   <input
-                  type="date"
-                  className={inputStyle}
-                  value={cert.dateIssued}
-                  onChange={(e) =>
-                    updateCertificate(cert.id, "dateIssued", e.target.value)
-                  }
+                    type="date"
+                    className={inputStyle}
+                    value={cert.dateIssued}
+                    onChange={(e) =>
+                      updateCertificate(cert.id, "dateIssued", e.target.value)
+                    }
                   />
 
                   <input
-                  type="date"
-                  className={inputStyle}
-                  value={cert.validUntil}
-                  onChange={(e) =>
-                    updateCertificate(cert.id, "validUntil", e.target.value)
-                  }
+                    type="date"
+                    className={inputStyle}
+                    value={cert.validUntil}
+                    onChange={(e) =>
+                      updateCertificate(cert.id, "validUntil", e.target.value)
+                    }
                   />
 
                   <button
-                  type="button"
-                  onClick={() => removeCertificate(cert.id)}
-                  className="border rounded-lg p-2"
+                    type="button"
+                    onClick={() => removeCertificate(cert.id)}
+                    className="flex items-center justify-center border border-[#D0E0F0] rounded-lg p-2 hover:bg-[#F9FBFD] transition"
                   >
-                  <Trash2 className="text-red-500" size={16} />
+                    <Trash2 className="w-4 h-4 text-[#FF0000]" />
                   </button>
                 </div>
-                ))}
+              ))}
             </div>
           </section>
 
-
           {/* VESSEL EXPERIENCE */}
           <section className="border border-[#E0E8F0] rounded-xl p-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-[#0080C0] mb-5">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-[#0080C0]">
                 Vessel Experience
               </h3>
               <button
                 type="button"
                 onClick={addVesselExperience}
-                className="flex items-center gap-2 bg-[#0080C0] text-white px-4 py-2 rounded-lg"
+                className="flex items-center gap-2 bg-[#0080C0] text-white px-4 py-2 rounded-lg hover:bg-[#006BA0] transition"
               >
                 <Plus className="w-4 h-4" /> Add Vessel
               </button>
             </div>
 
-            <div className="space-y-3">
-              {formData.vesselExperience.map((v: any) => (
-                <div key={v.id} className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <input
-                    value={v.manningCompany}
-                    onChange={(e) => updateVesselExperience(v.id, "manningCompany", e.target.value)}
-                    className={inputStyle}
-                    placeholder="Manning Company"
-                  />
-                  <input
-                    value={v.principal}
-                    onChange={(e) => updateVesselExperience(v.id, "principal", e.target.value)}
-                    className={inputStyle}
-                    placeholder="Principal"
-                  />
-                  <input
-                    value={v.rank}
-                    onChange={(e) => updateVesselExperience(v.id, "rank", e.target.value)}
-                    className={inputStyle}
-                    placeholder="Rank"
-                  />
-                  <input
-                    value={v.vesselName}
-                    onChange={(e) => updateVesselExperience(v.id, "vesselName", e.target.value)}
-                    className={inputStyle}
-                    placeholder="Vessel Name"
-                  />
-                  <input
-                    value={v.flag}
-                    onChange={(e) => updateVesselExperience(v.id, "flag", e.target.value)}
-                    className={inputStyle}
-                    placeholder="Flag"
-                  />
-                  <input
-                    value={v.vesselType}
-                    onChange={(e) => updateVesselExperience(v.id, "vesselType", e.target.value)}
-                    className={inputStyle}
-                    placeholder="Vessel Type"
-                  />
-                  <input
-                    value={v.grt}
-                    onChange={(e) => updateVesselExperience(v.id, "grt", e.target.value)}
-                    className={inputStyle}
-                    placeholder="GRT"
-                  />
-                  <input
-                    value={v.engineMaker}
-                    onChange={(e) => updateVesselExperience(v.id, "engineMaker", e.target.value)}
-                    className={inputStyle}
-                    placeholder="Main Engine Maker"
-                  />
-                  <input
-                    value={v.trading}
-                    onChange={(e) => updateVesselExperience(v.id, "trading", e.target.value)}
-                    className={inputStyle}
-                    placeholder="Trading"
-                  />
-                  <input
-                    value={v.route}
-                    onChange={(e) => updateVesselExperience(v.id, "route", e.target.value)}
-                    className={inputStyle}
-                    placeholder="Route"
-                  />
-                  <input
-                    type="date"
-                    value={v.signedOn}
-                    onChange={(e) => updateVesselExperience(v.id, "signedOn", e.target.value)}
-                    className={inputStyle}
-                  />
-                  <input
-                    type="date"
-                    value={v.signedOff}
-                    onChange={(e) => updateVesselExperience(v.id, "signedOff", e.target.value)}
-                    className={inputStyle}
-                  />
-                  <input
-                    value={v.causeOfDischarge}
-                    onChange={(e) => updateVesselExperience(v.id, "causeOfDischarge", e.target.value)}
-                    className={inputStyle}
-                    placeholder="Cause of Discharge"
-                  />
+            <div className="space-y-6">
+              {formData.vesselExperience.map((v) => (
+                <div key={v.id} className="border border-[#E0E8F0] rounded-lg p-4 bg-[#F9FBFD]">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <input
+                      value={v.manningCompany}
+                      onChange={(e) =>
+                        updateVesselExperience(v.id, "manningCompany", e.target.value)
+                      }
+                      className={inputStyle}
+                      placeholder="Manning Company"
+                    />
+                    <input
+                      value={v.principal}
+                      onChange={(e) =>
+                        updateVesselExperience(v.id, "principal", e.target.value)
+                      }
+                      className={inputStyle}
+                      placeholder="Principal"
+                    />
+                    <input
+                      value={v.rank}
+                      onChange={(e) =>
+                        updateVesselExperience(v.id, "rank", e.target.value)
+                      }
+                      className={inputStyle}
+                      placeholder="Rank"
+                    />
+                    <input
+                      value={v.vesselName}
+                      onChange={(e) =>
+                        updateVesselExperience(v.id, "vesselName", e.target.value)
+                      }
+                      className={inputStyle}
+                      placeholder="Vessel Name"
+                    />
+                    <input
+                      value={v.flag}
+                      onChange={(e) =>
+                        updateVesselExperience(v.id, "flag", e.target.value)
+                      }
+                      className={inputStyle}
+                      placeholder="Flag"
+                    />
+                    <input
+                      value={v.vesselType}
+                      onChange={(e) =>
+                        updateVesselExperience(v.id, "vesselType", e.target.value)
+                      }
+                      className={inputStyle}
+                      placeholder="Vessel Type"
+                    />
+                    <input
+                      value={v.grt}
+                      onChange={(e) =>
+                        updateVesselExperience(v.id, "grt", e.target.value)
+                      }
+                      className={inputStyle}
+                      placeholder="GRT"
+                    />
+                    <input
+                      value={v.mainEngine}
+                      onChange={(e) =>
+                        updateVesselExperience(v.id, "mainEngine", e.target.value)
+                      }
+                      className={inputStyle}
+                      placeholder="Main Engine"
+                    />
+                    <input
+                      value={v.tradingRoute}
+                      onChange={(e) =>
+                        updateVesselExperience(v.id, "tradingRoute", e.target.value)
+                      }
+                      className={inputStyle}
+                      placeholder="Trading Route"
+                    />
+                    <input
+                      type="date"
+                      value={v.signedOn}
+                      onChange={(e) =>
+                        updateVesselExperience(v.id, "signedOn", e.target.value)
+                      }
+                      className={inputStyle}
+                      placeholder="Signed On"
+                    />
+                    <input
+                      type="date"
+                      value={v.signedOff}
+                      onChange={(e) =>
+                        updateVesselExperience(v.id, "signedOff", e.target.value)
+                      }
+                      className={inputStyle}
+                      placeholder="Signed Off"
+                    />
+                    <input
+                      value={v.causeOfDischarge}
+                      onChange={(e) =>
+                        updateVesselExperience(v.id, "causeOfDischarge", e.target.value)
+                      }
+                      className={inputStyle}
+                      placeholder="Cause of Discharge"
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => removeVesselExperience(v.id)}
-                    className="flex items-center justify-center border border-[#D0E0F0] rounded-lg p-2 hover:bg-[#F9FBFD] col-span-3"
+                    className="mt-3 flex items-center gap-2 text-[#FF0000] hover:text-[#CC0000] transition"
                   >
-                    <Trash2 className="w-4 h-4 text-[#FF0000]" />
+                    <Trash2 className="w-4 h-4" />
+                    Remove Vessel
                   </button>
                 </div>
               ))}
@@ -944,7 +998,7 @@ export function CrewApplicationForm({
               name="remarks"
               value={formData.remarks}
               onChange={handleInputChange}
-              className={`${inputStyle} min-h-30 resize-none`}
+              className={`${inputStyle} min-h-25 resize-none`}
               placeholder="Add remarks here..."
             />
           </section>

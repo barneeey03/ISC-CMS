@@ -1,7 +1,6 @@
 import { CrewMember, Certificate, VesselExperience } from "./type";
 
 class DataStore {
-  [x: string]: any;
   private crews: Map<string, CrewMember> = new Map();
   private nextId = 1;
 
@@ -13,48 +12,30 @@ class DataStore {
       id,
       createdAt: new Date().toISOString(),
       status: "pending",
-      rank: "",
-      dateApplied: "",
-      presentRank: "",
-      prevSalary: "",
-      province: "",
-      dateOfAvailability: "",
-      expectedSalary: "",
-      placeOfBirth: "",
-      numOfChildren: "",
-      religion: "",
-      nextOfKin: "",
-      nextOfKinAddress: "",
-      schoolAttended: "",
-      weight: "",
-      course: "",
-      yearGraduated: "",
-      bmi: "",
-      ishihara: "",
-      certificates: [],
-      vesselExperience: [],
-      fullName: "",
-      fathersName: "",
-      mothersName: "",
-      dateOfBirth: "",
-      age: 0,
-      nationality: "",
-      gender: "",
-      height: "",
-      uniformSize: "",
-      civilStatus: "",
-      mobileNumber: "",
-      emailAddress: "",
-      completeAddress: "",
-      highSchool: { schoolName: "", yearGraduated: "" },
-      college: { schoolName: "", course: "", yearGraduated: "" },
-      documents: [],
-      seaService: [],
-      medical: { certificateType: "", issuingClinic: "", dateIssued: "", expiryDate: "" },
-      vesselType: "",
-      remarks: "",
-      vesselName: "",
-      principal: ""
+      
+      // Ensure all required fields have defaults
+      certificates: crew.certificates || [],
+      vesselExperience: crew.vesselExperience || [],
+      documents: crew.documents || [],
+      seaService: crew.seaService || [],
+      
+      medical: crew.medical || {
+        certificateType: "",
+        issuingClinic: "",
+        dateIssued: "",
+        expiryDate: "",
+      },
+      
+      highSchool: crew.highSchool || { 
+        schoolName: "", 
+        yearGraduated: "" 
+      },
+      
+      college: crew.college || { 
+        schoolName: "", 
+        course: "", 
+        yearGraduated: "" 
+      },
     };
 
     this.crews.set(id, newCrew);
@@ -71,15 +52,17 @@ class DataStore {
 
   updateCrew(id: string, updates: Partial<CrewMember>): CrewMember | undefined {
     const crew = this.crews.get(id);
-    if (crew) {
-      const updated = { ...crew, ...updates };
-      this.crews.set(id, updated);
-      return updated;
-    }
-    return undefined;
+    if (!crew) return undefined;
+
+    const updated = { ...crew, ...updates };
+    this.crews.set(id, updated);
+    return updated;
   }
 
-  updateCrewStatus(id: string, status: CrewMember["status"]): CrewMember | undefined {
+  updateCrewStatus(
+    id: string,
+    status: CrewMember["status"]
+  ): CrewMember | undefined {
     const crew = this.crews.get(id);
     if (!crew) return undefined;
 
@@ -94,3 +77,4 @@ class DataStore {
 }
 
 export const dataStore = new DataStore();
+export type { CrewMember, Certificate, VesselExperience };

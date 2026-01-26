@@ -66,43 +66,38 @@ export default function SuperAdminCrewApplications() {
   /* ============================
      ACTION HANDLERS
   ============================ */
-  const handleApprove = async (id: string) => {
-    await updateCrewInFirestore(id, { status: "approved" });
-    await updateCrewDatabaseInFirestore(id, { status: "approved" });
-    setSelectedCrew(null);
-  };
+    const handleApprove = async (id: string) => {
+        await updateCrewInFirestore(id, { status: "approved" });
+        setSelectedCrew(null);
+        setStatusFilter("all");
+      };
 
-  const handleDisapprove = async (id: string, reconsider?: boolean) => {
-    const payload = { status: reconsider ? "fooled" : "disapproved" };
+      const handleDisapprove = async (id: string, reconsider?: boolean) => {
+        await updateCrewInFirestore(id, {
+          status: reconsider ? "fooled" : "disapproved",
+        });
+        setSelectedCrew(null);
+        setStatusFilter("all");
+      };
 
-    await updateCrewInFirestore(id, payload);
-    await updateCrewDatabaseInFirestore(id, payload);
+      const handleProposed = async (id: string) => {
+        await updateCrewInFirestore(id, { status: "proposed" });
+        setSelectedCrew(null);
+        setStatusFilter("all");
+      };
 
-    setSelectedCrew(null);
-  };
+      const handleFooled = async (id: string) => {
+        await updateCrewInFirestore(id, { status: "fooled" });
+        setSelectedCrew(null);
+        setStatusFilter("all");
+      };
 
-  const handleProposed = async (id: string) => {
-    await updateCrewInFirestore(id, { status: "proposed" });
-    await updateCrewDatabaseInFirestore(id, { status: "proposed" });
-
-    setSelectedCrew(null);
-  };
-
-  const handleFooled = async (id: string) => {
-    await updateCrewInFirestore(id, { status: "fooled" });
-    await updateCrewDatabaseInFirestore(id, { status: "fooled" });
-
-    setSelectedCrew(null);
-  };
-
-  const confirmDelete = async () => {
-    if (!deleteTargetId) return;
-
-    await deleteCrewFromFirestore(deleteTargetId);
-    setShowDeleteConfirm(false);
-    setDeleteTargetId(null);
-  };
-
+      const confirmDelete = async () => {
+        if (!deleteTargetId) return;
+        await deleteCrewFromFirestore(deleteTargetId);
+        setShowDeleteConfirm(false);
+        setDeleteTargetId(null);
+      };
   /* ============================
      HELPERS
   ============================ */
