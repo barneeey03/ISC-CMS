@@ -27,7 +27,7 @@ export function SuperAdminSidebar() {
 
   const menuItems = [
     { href: "/super-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/super-admin/crew-applications", label: "Crew Applications", icon: Users },
+    { href: "/super-admin/crew-applications", label: "Endorsement", icon: Users },
     { href: "/super-admin/disapproved-crew", label: "Disapproved Crew", icon: XCircle },
     { href: "/super-admin/crew-database", label: "Crew Database", icon: Database },
     { href: "/super-admin/vessel-assignment", label: "Vessel Assignment", icon: Ship },
