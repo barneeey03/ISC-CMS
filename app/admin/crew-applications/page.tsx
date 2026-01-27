@@ -21,7 +21,7 @@ import { db } from "@/app/lib/firebase";
 /* ============================
    TYPES
 ============================ */
-type ExamStatus = "all" | "passed" | "failed";
+type ExamStatus = "all" | "passed" | "failed" | "pending" | "on-hold";
 
 /* ============================
    ASYNC LOADERS
@@ -140,6 +140,10 @@ export default function CrewApplications() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
+  // NEW STATES FOR RECONSIDER
+  const [showReconsiderConfirm, setShowReconsiderConfirm] = useState(false);
+  const [reconsiderTargetId, setReconsiderTargetId] = useState<string | null>(null);
+
   /* ============================
      FIRESTORE SYNC
   ============================ */
@@ -203,8 +207,12 @@ export default function CrewApplications() {
       if (
         examStatus !== "all" &&
         (examStatus === "passed"
-          ? !["approved", "assigned"].includes(crew.status)
-          : crew.status !== "disapproved")
+          ? crew.status !== "passed"
+          : examStatus === "failed"
+          ? crew.status !== "failed"
+          : examStatus === "pending"
+          ? crew.status !== "pending"
+          : crew.status !== "on-hold")
       )
         return false;
 
@@ -252,6 +260,32 @@ export default function CrewApplications() {
     const doc = new jsPDF();
     doc.text("Crew Applications Report", 14, 20);
     doc.save("crew_applications_report.pdf");
+  };
+
+  /* ============================
+     APPROVE / DISAPPROVE
+  ============================
+  */
+  const handleApprove = async (id: string, remarks?: string) => {
+    await updateCrewInFirestore(id, {
+      status: "passed",
+      remarks: remarks || "Passed",
+    });
+  };
+
+  const handleDisapprove = async (id: string, remarks?: string) => {
+    await updateCrewInFirestore(id, {
+      status: "failed",
+      remarks: remarks || "Failed",
+    });
+  };
+
+  // NEW FUNCTION FOR RECONSIDER
+  const handleReconsider = async (id: string) => {
+    await updateCrewInFirestore(id, {
+      status: "on-hold",
+      remarks: "Reconsidered - On Hold",
+    });
   };
 
   /* ============================
@@ -313,6 +347,8 @@ export default function CrewApplications() {
                 <option value="all">All Status</option>
                 <option value="passed">Passed</option>
                 <option value="failed">Failed</option>
+                <option value="pending">Pending</option>
+                <option value="on-hold">On-Hold</option>
               </select>
 
               <AsyncMultiSelect
@@ -434,11 +470,12 @@ export default function CrewApplications() {
                           <span
                             className={`px-3 py-1 rounded-full text-xs
                               ${
-                                crew.status === "approved" ||
-                                crew.status === "assigned"
+                                crew.status === "passed"
                                   ? "bg-green-100 text-green-700"
-                                  : crew.status === "disapproved"
+                                  : crew.status === "failed"
                                   ? "bg-red-100 text-red-700"
+                                  : crew.status === "pending"
+                                  ? "bg-blue-100 text-blue-700"
                                   : "bg-yellow-100 text-yellow-700"
                               }`}
                           >
@@ -468,6 +505,19 @@ export default function CrewApplications() {
                             >
                               <Trash2 size={16} />
                             </button>
+
+                            {/* NEW RECONSIDER BUTTON */}
+                            {crew.status === "failed" && (
+                              <button
+                                onClick={() => {
+                                  setReconsiderTargetId(crew.id);
+                                  setShowReconsiderConfirm(true);
+                                }}
+                                className="px-3 py-1 rounded bg-yellow-500 text-white text-xs"
+                              >
+                                Reconsider
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -505,18 +555,8 @@ export default function CrewApplications() {
             <CrewDetailsModal
               crew={selectedCrew}
               onClose={() => setSelectedCrew(null)}
-              onApprove={function (id: string): void {
-                throw new Error("Function not implemented.");
-              }}
-              onDisapprove={function (id: string, reconsider?: boolean): void {
-                throw new Error("Function not implemented.");
-              }}
-              onProposed={function (id: string): void {
-                throw new Error("Function not implemented.");
-              }}
-              onPooled={function (id: string): void {
-                throw new Error("Function not implemented.");
-              }}
+              onApprove={handleApprove}
+              onDisapprove={handleDisapprove}
             />
           )}
 
@@ -537,6 +577,7 @@ export default function CrewApplications() {
             />
           )}
 
+          {/* DELETE CONFIRM */}
           {showDeleteConfirm && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
               <div className="bg-white p-6 rounded-xl">
@@ -557,6 +598,38 @@ export default function CrewApplications() {
                       setShowDeleteConfirm(false);
                     }}
                     className="px-4 py-2 bg-red-600 text-white rounded-lg"
+                  >
+                    Yes
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* RECONSIDER CONFIRM (NEW) */}
+          {showReconsiderConfirm && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-white p-6 rounded-xl">
+                <h2 className="font-semibold mb-4">
+                  Reconsider this application?
+                </h2>
+                <p className="mb-4 text-sm text-gray-600">
+                  Once confirmed, status will change to <b>On-Hold</b>.
+                </p>
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setShowReconsiderConfirm(false)}
+                    className="px-4 py-2 bg-gray-200 rounded-lg"
+                  >
+                    No
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!reconsiderTargetId) return;
+                      await handleReconsider(reconsiderTargetId);
+                      setShowReconsiderConfirm(false);
+                    }}
+                    className="px-4 py-2 bg-yellow-500 text-white rounded-lg"
                   >
                     Yes
                   </button>

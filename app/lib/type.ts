@@ -1,8 +1,8 @@
 export type CrewMemberStatus =
   | "pending"
-  | "proposed"
-  | "approved"
-  | "disapproved"
+  | "passed"
+  | "failed"
+  | "on-hold"
   | "pooled"
   | "assigned";
 
