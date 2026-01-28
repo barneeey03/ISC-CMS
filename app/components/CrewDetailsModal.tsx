@@ -263,7 +263,77 @@ export function CrewDetailsModal({
               <p className="text-sm text-gray-600">No medical record.</p>
             )}
           </Section>
-
+          {/* ====== CERTIFICATES ====== */}
+          <Section
+            title="Certificates"
+            isOpen={openSection === "certificates"}
+            onToggle={() => toggleSection("certificates")}
+          >
+            {crew.certificates && crew.certificates.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-200 rounded-lg text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-4 py-2 border-b text-left">Certificate Name</th>
+                      <th className="px-4 py-2 border-b text-left">Place Issued</th>
+                      <th className="px-4 py-2 border-b text-left">Date Issued</th>
+                      <th className="px-4 py-2 border-b text-left">Valid Until</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {crew.certificates.map((c) => (
+                      <tr key={c.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 border-b">{c.name || "—"}</td>
+                        <td className="px-4 py-2 border-b">{c.placeIssued || "—"}</td>
+                        <td className="px-4 py-2 border-b">{c.dateIssued || "—"}</td>
+                        <td className="px-4 py-2 border-b">{c.expiryDate || "—"}</td> {/* ✅ Now uses expiryDate */}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600">No certificates added.</p>
+            )}
+          </Section>
+        {/* ====== VESSEL EXPERIENCE ====== */}
+        <Section
+          title="Vessel Experience"
+          isOpen={openSection === "vesselExperience"}
+          onToggle={() => toggleSection("vesselExperience")}
+        >
+          {crew.vesselExperience && crew.vesselExperience.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full border border-gray-200 rounded-lg text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="px-4 py-2 border-b text-left">Manning Company</th>
+                    <th className="px-4 py-2 border-b text-left">Principal</th>
+                    <th className="px-4 py-2 border-b text-left">Rank</th>
+                    <th className="px-4 py-2 border-b text-left">Vessel Name</th>
+                    <th className="px-4 py-2 border-b text-left">Flag</th>
+                    <th className="px-4 py-2 border-b text-left">Vessel Type</th>
+                    <th className="px-4 py-2 border-b text-left">GRT</th>
+                    <th className="px-4 py-2 border-b text-left">Main Engine</th>
+                    <th className="px-4 py-2 border-b text-left">Trading Route</th>
+                    <th className="px-4 py-2 border-b text-left">Signed In</th>
+                    <th className="px-4 py-2 border-b text-left">Signed Off</th>
+                    <th className="px-4 py-2 border-b text-left">Cause of Discharge</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {crew.vesselExperience.map((v) => (
+                    <tr key={v.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 border-b">{v.manningCompany}</td><td className="px-4 py-2 border-b">{v.principal}</td><td className="px-4 py-2 border-b">{v.rank}</td><td className="px-4 py-2 border-b">{v.vesselName}</td><td className="px-4 py-2 border-b">{v.flag}</td><td className="px-4 py-2 border-b">{v.vesselType}</td><td className="px-4 py-2 border-b">{v.grt}</td><td className="px-4 py-2 border-b">{v.mainEngine}</td><td className="px-4 py-2 border-b">{v.tradingRoute}</td><td className="px-4 py-2 border-b">{v.signedOn}</td><td className="px-4 py-2 border-b">{v.signedOff}</td><td className="px-4 py-2 border-b">{v.causeOfDischarge}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-600">No vessel experience added.</p>
+          )}
+        </Section>
           {/* Remarks Section */}
           <Section
             title="Remarks"
@@ -308,11 +378,12 @@ function Section({
 }
 
 // Reusable component for details
-function Detail({ label, value }: { label: string; value: string }) {
+function Detail({ label, value }: { label: string; value: string | ((arg: any) => any) }) {
+  const displayValue = typeof value === 'function' ? JSON.stringify(value(null)) : value;
   return (
     <div>
       <p className="text-xs text-black/60">{label}</p>
-      <p className="font-semibold">{value || "—"}</p>
+      <p className="font-semibold">{displayValue || "—"}</p>
     </div>
   );
 }

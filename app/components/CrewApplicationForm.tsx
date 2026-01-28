@@ -10,16 +10,50 @@ import {
 import { addCrewToFirestore, updateCrewInFirestore } from "@/app/lib/crewservice";
 import { serverTimestamp } from "firebase/firestore";
 
+// Form-friendly types
 type Medical = {
+  name?: string;
+  type?: string;
+  medicalType?: string;
   certificateType: string;
   issuingClinic: string;
   dateIssued: string;
   expiryDate: string;
 };
 
-type CrewFormData = Omit<CrewMember, "id" | "createdAt" | "age" | "medicals"> & {
+type FormCertificate = {
+  id: string;
+  name: string;
+  number?: string;
+  documentNo?: string;
+  referenceNo?: string;
+  placeIssued?: string;
+  trainingCenter?: string;
+  dateIssued?: string;
+  expiryDate: string;
+  expiry?: string;
+};
+
+type FormDocument = {
+  id: string;
+  name: string;
+  placeIssued?: string;
+  documentNo?: string;
+  number?: string;
+  referenceNo?: string;
+  dateIssued?: string;
+  expiryDate?: string;
+};
+
+type CrewFormData = Omit<
+  CrewMember,
+  "id" | "createdAt" | "age" | "medicals" | "certificates" | "documents"
+> & {
   age: string;
   medicals: Medical[];
+  medical: Medical;
+  certificates: FormCertificate[];
+  documents: FormDocument[];
 };
 
 interface CrewApplicationFormProps {
@@ -113,12 +147,15 @@ export function CrewApplicationForm({
     bmi: "",
     ishihara: "",
 
-    // Documents
+    // Documents - ✅ FIXED: Now includes documentNo field
     documents: [
       {
         id: `doc-${Date.now()}`,
         name: "",
+        documentNo: "",
         placeIssued: "",
+        number: "",
+        referenceNo: "",
         dateIssued: "",
         expiryDate: "",
       },
@@ -133,15 +170,18 @@ export function CrewApplicationForm({
     // Sea Service
     seaService: [],
 
-    // Medical
+    // Medical - ✅ FIXED: Added all necessary fields
     medical: {
+      name: "",
+      type: "",
+      medicalType: "",
       certificateType: "",
       issuingClinic: "",
       dateIssued: "",
       expiryDate: "",
     },
 
-    // Medicals array for type compliance
+    // Medicals array for Firestore
     medicals: [],
 
     // Additional fields
@@ -151,67 +191,57 @@ export function CrewApplicationForm({
   });
 
   useEffect(() => {
-  if (mode === "edit" && crew) {
-    setFormData((prev) => ({
-      ...prev,
-      ...crew,
-      age: crew.age ? String(crew.age) : "",
-
-      // Vessel Experience
-      vesselExperience:
-        crew.vesselExperience?.map((v, index) => ({
-          id: v.id || `vexp-${Date.now()}-${index}`,
-          assignmentId: v.assignmentId || "",
-          manningCompany: v.manningCompany || "",
-          principal: v.principal || "",
-          rank: v.rank || "",
-          vesselName: v.vesselName || "",
-          flag: v.flag || "",
-          vesselType: v.vesselType || "",
-          grt: v.grt || "",
-          mainEngine: v.mainEngine || "",
-          tradingRoute: v.tradingRoute || "",
-          signedOn: v.signedOn || "",
-          signedOff: v.signedOff || "",
-          causeOfDischarge: v.causeOfDischarge || "",
-        })) || [],
-
-      // Certificates
-      certificates:
-        crew.certificates?.map((c, index) => ({
-          id: c.id || `cert-${Date.now()}-${index}`,
-          name: c.name || "",
-          certificateNo: c.certificateNo || "",
-          number: c.number || c.certificateNo || "", // Ensure "number" is present
-          placeIssued: c.placeIssued || "",
-          trainingCenter: c.trainingCenter || "",
-          dateIssued: c.dateIssued || "",
-          validUntil: c.validUntil || "",
-          expiryDate: c.expiryDate || "",
-          referenceNo: c.referenceNo || "",
-        })) || [],
-
-      // Documents
-      documents:
-        crew.documents?.map((d, index) => ({
-          id: d.id || `doc-${Date.now()}-${index}`,
+    if (mode === "edit" && crew) {
+      setFormData((prev) => ({
+        ...prev,
+        ...crew,
+        age: crew.age ? String(crew.age) : "",
+        certificates:
+          crew.certificates?.map((c) => ({
+            id: c.id || `cert-${Date.now()}-${Math.random()}`,
+            name: c.name || "",
+            number: c.number || "",
+            documentNo: c.documentNo || c.number || "",
+            referenceNo: c.referenceNo || "",
+            placeIssued: c.placeIssued || "",
+            trainingCenter: c.trainingCenter || "",
+            dateIssued: c.dateIssued || "",
+            expiryDate: c.expiryDate || "",
+            expiry: c.expiry || "",
+          })) || [],
+        documents: crew.documents?.map((d) => ({
+          id: d.id || `doc-${Date.now()}-${Math.random()}`,
           name: d.name || "",
+          documentNo: d.documentNo || d.placeIssued || d.number || "",
           placeIssued: d.placeIssued || "",
+          number: d.number || "",
+          referenceNo: d.referenceNo || "",
           dateIssued: d.dateIssued || "",
           expiryDate: d.expiryDate || "",
         })) || prev.documents,
+        medical: crew.medicals?.[0] ? {
+          name: crew.medicals[0].name || "",
+          type: crew.medicals[0].type || "",
+          medicalType: crew.medicals[0].medicalType || "",
+          certificateType: crew.medicals[0].certificateType || "",
+          issuingClinic: crew.medicals[0].issuingClinic || "",
+          dateIssued: crew.medicals[0].dateIssued || "",
+          expiryDate: crew.medicals[0].expiryDate || "",
+        } : prev.medical,
+        medicals: crew.medicals || prev.medicals,
+        vesselExperience: 
+          crew.vesselExperience?.map((v) => ({
+            ...v,
+            duration: typeof v.duration === "function" ? "" : v.duration || "",
+          })) || [],
+        highSchool: crew.highSchool || prev.highSchool,
+        college: crew.college || prev.college,
+        seaService: crew.seaService || prev.seaService,
+      }));
+    }
+  }, [mode, crew]);
 
-      // Other nested objects
-      highSchool: crew.highSchool || prev.highSchool,
-      college: crew.college || prev.college,
-      medical: crew.medical || prev.medical,
-      medicals: crew.medicals || prev.medicals,
-      seaService: crew.seaService || prev.seaService,
-    }));
-  }
-}, [mode, crew]);
-
-
+  // Age calculation
   const calculateAge = (dob: string) => {
     if (!dob) return "";
     const birthDate = new Date(dob);
@@ -222,6 +252,7 @@ export function CrewApplicationForm({
     return String(age);
   };
 
+  // Generic input handler
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
@@ -247,7 +278,7 @@ export function CrewApplicationForm({
     }
   };
 
-  // Certificate Functions
+  // Certificates
   const addCertificate = () => {
     setFormData((prev) => ({
       ...prev,
@@ -257,12 +288,14 @@ export function CrewApplicationForm({
           id: `cert-${Date.now()}-${Math.random()}`,
           name: "",
           number: "",
+          documentNo: "",
+          referenceNo: "",
           placeIssued: "",
           trainingCenter: "",
           dateIssued: "",
-          validUntil: "",
-          referenceNo: "",
-        } as any,
+          expiryDate: "",
+          expiry: "",
+        },
       ],
     }));
   };
@@ -274,7 +307,7 @@ export function CrewApplicationForm({
     }));
   };
 
-  const updateCertificate = (id: string, field: keyof Certificate, value: string) => {
+  const updateCertificate = (id: string, field: keyof FormCertificate, value: string) => {
     setFormData((prev) => ({
       ...prev,
       certificates: prev.certificates.map((c) =>
@@ -283,18 +316,21 @@ export function CrewApplicationForm({
     }));
   };
 
-  // Document Functions
+  // Documents - ✅ FIXED: Now properly handles documentNo
   const addDocument = () => {
     setFormData((prev) => ({
       ...prev,
       documents: [
         ...prev.documents,
-        {
-          id: `doc-${Date.now()}-${Math.random()}`,
-          name: "",
-          placeIssued: "",
-          dateIssued: "",
-          expiryDate: "",
+        { 
+          id: `doc-${Date.now()}-${Math.random()}`, 
+          name: "", 
+          documentNo: "",
+          placeIssued: "", 
+          number: "",
+          referenceNo: "",
+          dateIssued: "", 
+          expiryDate: "" 
         },
       ],
     }));
@@ -309,18 +345,16 @@ export function CrewApplicationForm({
 
   const updateDocument = (
     id: string,
-    field: "name" | "placeIssued" | "dateIssued" | "expiryDate",
+    field: keyof FormDocument,
     value: string
   ) => {
     setFormData((prev) => ({
       ...prev,
-      documents: prev.documents.map((d) =>
-        d.id === id ? { ...d, [field]: value } : d
-      ),
+      documents: prev.documents.map((d) => (d.id === id ? { ...d, [field]: value } : d)),
     }));
   };
 
-  // Vessel Experience Functions
+  // Vessel Experience
   const addVesselExperience = () => {
     setFormData((prev) => ({
       ...prev,
@@ -341,6 +375,7 @@ export function CrewApplicationForm({
           signedOn: "",
           signedOff: "",
           causeOfDischarge: "",
+          duration: "",
         },
       ],
     }));
@@ -353,11 +388,7 @@ export function CrewApplicationForm({
     }));
   };
 
-  const updateVesselExperience = (
-    id: string,
-    field: keyof VesselExperience,
-    value: string
-  ) => {
+  const updateVesselExperience = (id: string, field: keyof VesselExperience, value: string) => {
     setFormData((prev) => ({
       ...prev,
       vesselExperience: prev.vesselExperience.map((v) =>
@@ -366,28 +397,44 @@ export function CrewApplicationForm({
     }));
   };
 
-  const sortVesselExperienceLatestFirst = (vessels: VesselExperience[]) => {
-    return [...vessels].sort((a, b) => {
+  const sortVesselExperienceLatestFirst = (vessels: VesselExperience[]) =>
+    [...vessels].sort((a, b) => {
       const aDate = a.signedOn ? new Date(a.signedOn).getTime() : 0;
       const bDate = b.signedOn ? new Date(b.signedOn).getTime() : 0;
       return bDate - aDate;
     });
-  };
 
+  // Submit - ✅ FIXED: Properly structures all data
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const sortedVesselExperience = sortVesselExperienceLatestFirst(
-      formData.vesselExperience
-    );
+    const sortedVesselExperience = sortVesselExperienceLatestFirst(formData.vesselExperience);
+
+    // ✅ FIXED: Ensure medical data has all necessary fields
+    const medicalWithAllFields = {
+      ...formData.medical,
+      name: formData.medical.certificateType || formData.medical.name || "PEME",
+      type: formData.medical.certificateType || formData.medical.type || "PEME",
+      medicalType: formData.medical.certificateType || formData.medical.medicalType || "PEME",
+    };
 
     const payload: CrewMember = {
       ...formData,
-      vesselExperience: sortedVesselExperience,
       age: Number(formData.age),
+      vesselExperience: sortedVesselExperience,
+      medicals: [medicalWithAllFields],
+      certificates: formData.certificates.map((c) => ({
+        ...c,
+        documentNo: c.documentNo || c.number || "",
+        expiryDate: c.expiryDate || "",
+      })),
+      documents: formData.documents.map((d) => ({
+        ...d,
+        documentNo: d.documentNo || d.placeIssued || d.number || "",
+        expiryDate: d.expiryDate || "",
+      })),
       createdAt: serverTimestamp() as any,
-      medicals: [formData.medical],
-    } as CrewMember;
+    } as unknown as CrewMember;
 
     try {
       if (mode === "edit" && crew?.id) {
@@ -407,6 +454,7 @@ export function CrewApplicationForm({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+        {/* HEADER */}
         <div className="sticky top-0 z-10 flex items-center justify-between p-6 border-b border-[#E0E8F0] bg-white">
           <h2 className="text-2xl font-extrabold text-[#002060]">
             {mode === "edit" ? "Edit Crew Application" : "Crew Application Form"}
@@ -600,20 +648,34 @@ export function CrewApplicationForm({
             </div>
           </section>
 
-          {/* NEXT OF KIN */}
+          {/* FAMILY INFORMATION */}
           <section className="border border-[#E0E8F0] rounded-xl p-6">
             <h3 className="text-lg font-bold text-[#0080C0] mb-5">
-              Next of Kin
+              Family Information
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                name="fathersName"
+                value={formData.fathersName}
+                onChange={handleInputChange}
+                className={inputStyle}
+                placeholder="Father's Name"
+              />
+              <input
+                name="mothersName"
+                value={formData.mothersName}
+                onChange={handleInputChange}
+                className={inputStyle}
+                placeholder="Mother's Name"
+              />
               <input
                 name="nextOfKin"
                 value={formData.nextOfKin}
                 onChange={handleInputChange}
                 required
                 className={inputStyle}
-                placeholder="Name of Next of Kin / Relationship"
+                placeholder="Next of Kin / Relationship"
               />
               <input
                 name="nextOfKinAddress"
@@ -621,7 +683,7 @@ export function CrewApplicationForm({
                 onChange={handleInputChange}
                 required
                 className={inputStyle}
-                placeholder="Address"
+                placeholder="Next of Kin Address"
               />
             </div>
           </section>
@@ -707,7 +769,7 @@ export function CrewApplicationForm({
             </div>
           </section>
 
-          {/* DOCUMENTS */}
+          {/* DOCUMENTS - ✅ FIXED: Now includes documentNo field */}
           <section className="border border-[#E0E8F0] rounded-xl p-6">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-lg font-bold text-[#0080C0]">
@@ -744,9 +806,9 @@ export function CrewApplicationForm({
                   </select>
 
                   <input
-                    value={doc.placeIssued}
+                    value={doc.documentNo || doc.placeIssued || ""}
                     onChange={(e) =>
-                      updateDocument(doc.id, "placeIssued", e.target.value)
+                      updateDocument(doc.id, "documentNo", e.target.value)
                     }
                     className={inputStyle}
                     placeholder="Document No."
@@ -782,7 +844,7 @@ export function CrewApplicationForm({
             </div>
           </section>
 
-          {/* MEDICAL CERTIFICATE */}
+          {/* MEDICAL CERTIFICATE - ✅ FIXED: Added all field mappings */}
           <section className="border border-[#E0E8F0] rounded-xl p-6 bg-[#F9FBFD]">
             <h3 className="text-lg font-bold text-[#0080C0] mb-5">
               Medical Certificate
@@ -864,7 +926,7 @@ export function CrewApplicationForm({
                   <input
                     className={inputStyle}
                     placeholder="Certificate No."
-                    value={cert.number}
+                    value={cert.number || cert.documentNo || ""}
                     onChange={(e) =>
                       updateCertificate(cert.id, "number", e.target.value)
                     }
@@ -900,9 +962,9 @@ export function CrewApplicationForm({
                   <input
                     type="date"
                     className={inputStyle}
-                    value={cert.validUntil}
+                    value={cert.expiryDate}
                     onChange={(e) =>
-                      updateCertificate(cert.id, "validUntil", e.target.value)
+                      updateCertificate(cert.id, "expiryDate", e.target.value)
                     }
                   />
 

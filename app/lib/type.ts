@@ -7,16 +7,18 @@ export type CrewMemberStatus =
   | "assigned";
 
 export type Certificate = {
-  certificateNo: string;
-  expiryDate(expiryDate: any): { status: any; daysLeft: any; };
-  referenceNo: string;
   id: string;
   name: string;
   number: string;
+  documentNo: string;
+  certificateNo: string;
+  referenceNo: string;
   dateIssued: string;
+  expiryDate: string; // ✅ Changed from function to string
   validUntil: string;
   placeIssued: string;      
   trainingCenter: string;
+  expiry: string;
 };
 
 export type VesselExperience = {
@@ -34,6 +36,7 @@ export type VesselExperience = {
   signedOn: string;
   signedOff: string;
   causeOfDischarge: string;
+  duration: string; // ✅ Changed from union type to just string
 };
 
 export interface CrewMember {
@@ -94,9 +97,12 @@ export interface CrewMember {
 
   // Documents
   documents: {
+    documentNo: any;
+    number: any;
+    referenceNo: any;
     id: string;
     name: string;
-    placeIssued: string; // Document No.
+    placeIssued: string; // This is labeled as "Document No." in comment
     dateIssued: string;
     expiryDate: string;
   }[];
