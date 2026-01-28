@@ -2,11 +2,18 @@ export type CrewMemberStatus =
   | "pending"
   | "passed"
   | "failed"
+  | "approved"
+  | "disapproved"
+  | "proposed"
   | "on-hold"
   | "pooled"
   | "assigned";
 
 export type Certificate = {
+  certificateName: string;
+  certificateNumber: string;
+  dateOfIssue: string;
+  dateOfExpiry: string;
   id: string;
   name: string;
   number: string;
@@ -40,6 +47,11 @@ export type VesselExperience = {
 };
 
 export interface CrewMember {
+  shoeSize: string;
+  nearestAirport: string;
+  overallSize: string;
+  maritalStatus: string;
+  education: never[];
   documentStatus: string;
   medicals: any;
   // System fields
