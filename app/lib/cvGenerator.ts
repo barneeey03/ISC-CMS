@@ -323,195 +323,68 @@ async function generateISCFormatCV(
 
 /**
  * Generate Skeiron format CV (Excel-based)
- * Creates CV from scratch without relying on templates
  */
 async function generateSkieronCV(crew: CrewMember): Promise<Blob> {
   try {
     // Import ExcelJS dynamically
     const ExcelJS = (await import("exceljs")).default;
 
+    // Load the Skeiron template
+    const response = await fetch("/templates/SKEIRON_NEW_CV_FORM.xlsx");
+    
+    if (!response.ok) {
+      throw new Error(`Failed to load template: ${response.statusText}`);
+    }
+    
+    const arrayBuffer = await response.arrayBuffer();
+
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Crew Application Form");
+    await workbook.xlsx.load(arrayBuffer);
 
-    // Set column widths
-    worksheet.columns = [
-      { width: 5 },
-      { width: 25 },
-      { width: 30 },
-      { width: 15 },
-      { width: 15 },
-      { width: 15 },
-      { width: 15 },
-    ];
+    const worksheet = workbook.getWorksheet("Crew Application Form");
 
-    // Title
-    worksheet.mergeCells("A1:G1");
-    const titleCell = worksheet.getCell("A1");
-    titleCell.value = "SKEIRON CREW APPLICATION FORM";
-    titleCell.font = { size: 16, bold: true, color: { argb: "FFFFFFFF" } };
-    titleCell.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FF002060" },
-    };
-    titleCell.alignment = { vertical: "middle", horizontal: "center" };
-    worksheet.getRow(1).height = 30;
-
-    // Add spacing
-    worksheet.addRow([]);
-
-    // Personal Information Header
-    let currentRow = 3;
-    worksheet.mergeCells(`A${currentRow}:G${currentRow}`);
-    const sectionHeader = worksheet.getCell(`A${currentRow}`);
-    sectionHeader.value = "PERSONAL INFORMATION";
-    sectionHeader.font = { size: 12, bold: true };
-    sectionHeader.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FFD9E1F2" },
-    };
-    currentRow++;
-
-    // Personal Information
-    const personalInfo = [
-      ["Position Applied:", crew.presentRank || ""],
-      ["Full Name:", crew.fullName || ""],
-      ["Nationality:", crew.nationality || ""],
-      ["Date of Birth:", crew.dateOfBirth || ""],
-      ["Place of Birth:", crew.placeOfBirth || ""],
-      ["Height (cm):", crew.height?.toString() || ""],
-      ["Weight (kg):", crew.weight?.toString() || ""],
-      ["Email Address:", crew.emailAddress || ""],
-      ["Mobile Number:", crew.mobileNumber || ""],
-      ["Marital Status:", crew.maritalStatus || ""],
-      ["Nearest Airport:", crew.nearestAirport || ""],
-    ];
-
-    personalInfo.forEach(([label, value]) => {
-      worksheet.getCell(`B${currentRow}`).value = label;
-      worksheet.getCell(`B${currentRow}`).font = { bold: true };
-      worksheet.getCell(`C${currentRow}`).value = value;
-      currentRow++;
-    });
-
-    // Add spacing
-    currentRow++;
-
-    // Vessel Experience Header
-    worksheet.mergeCells(`A${currentRow}:G${currentRow}`);
-    const vesselHeader = worksheet.getCell(`A${currentRow}`);
-    vesselHeader.value = "SEA SERVICE EXPERIENCE";
-    vesselHeader.font = { size: 12, bold: true };
-    vesselHeader.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FFD9E1F2" },
-    };
-    currentRow++;
-
-    // Vessel Experience Table Headers
-    const headers = ["Vessel Name", "Type", "Rank", "Principal", "Sign On", "Sign Off"];
-    headers.forEach((header, index) => {
-      const cell = worksheet.getCell(currentRow, index + 2);
-      cell.value = header;
-      cell.font = { bold: true };
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FFE7E6E6" },
-      };
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-    });
-    currentRow++;
-
-    // Vessel Experience Data
-    const vessels = crew.vesselExperience || [];
-    vessels.forEach((vessel) => {
-      const data = [
-        vessel.vesselName || "",
-        vessel.vesselType || "",
-        vessel.rank || "",
-        vessel.principal || "",
-        vessel.signedOn || "",
-        vessel.signedOff || "",
-      ];
+    if (worksheet) {
+      // Fill in the crew data
+      // NOTE: Adjust these cell addresses based on your actual template
       
-      data.forEach((value, index) => {
-        const cell = worksheet.getCell(currentRow, index + 2);
-        cell.value = value;
-        cell.border = {
-          top: { style: "thin" },
-          left: { style: "thin" },
-          bottom: { style: "thin" },
-          right: { style: "thin" },
-        };
+      worksheet.getCell("C4").value = crew.presentRank || "";
+      worksheet.getCell("C5").value = crew.fullName || "";
+      worksheet.getCell("C6").value = crew.nationality || "";
+      worksheet.getCell("C7").value = crew.dateOfBirth || "";
+      worksheet.getCell("C8").value = crew.placeOfBirth || "";
+      worksheet.getCell("C9").value = crew.height || "";
+      worksheet.getCell("C10").value = crew.weight || "";
+      worksheet.getCell("C11").value = crew.emailAddress || "";
+      worksheet.getCell("C12").value = crew.mobileNumber || "";
+      worksheet.getCell("C13").value = crew.maritalStatus || "";
+      worksheet.getCell("C14").value = crew.nearestAirport || "";
+
+      // Fill vessel experience starting at a specific row
+      const vessels = crew.vesselExperience || [];
+      const vesselStartRow = 20; // Adjust this based on your template
+
+      vessels.forEach((vessel, index) => {
+        const row = vesselStartRow + index;
+        worksheet.getCell(`B${row}`).value = vessel.vesselName || "";
+        worksheet.getCell(`C${row}`).value = vessel.vesselType || "";
+        worksheet.getCell(`D${row}`).value = vessel.rank || "";
+        worksheet.getCell(`E${row}`).value = vessel.principal || "";
+        worksheet.getCell(`F${row}`).value = vessel.signedOn || "";
+        worksheet.getCell(`G${row}`).value = vessel.signedOff || "";
       });
-      currentRow++;
-    });
 
-    // Add spacing
-    currentRow += 2;
+      // Fill certificates if needed
+      const certificates = crew.certificates || [];
+      const certStartRow = 50; // Adjust based on template
 
-    // Certificates Header
-    worksheet.mergeCells(`A${currentRow}:G${currentRow}`);
-    const certHeader = worksheet.getCell(`A${currentRow}`);
-    certHeader.value = "CERTIFICATES & LICENSES";
-    certHeader.font = { size: 12, bold: true };
-    certHeader.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FFD9E1F2" },
-    };
-    currentRow++;
-
-    // Certificate Table Headers
-    const certHeaders = ["Certificate Name", "Number", "Issue Date", "Expiry Date"];
-    certHeaders.forEach((header, index) => {
-      const cell = worksheet.getCell(currentRow, index + 2);
-      cell.value = header;
-      cell.font = { bold: true };
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FFE7E6E6" },
-      };
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-    });
-    currentRow++;
-
-    // Certificate Data
-    const certificates = crew.certificates || [];
-    certificates.forEach((cert) => {
-      const data = [
-        cert.certificateName || "",
-        cert.certificateNumber || "",
-        cert.dateOfIssue || "",
-        cert.dateOfExpiry || "",
-      ];
-      
-      data.forEach((value, index) => {
-        const cell = worksheet.getCell(currentRow, index + 2);
-        cell.value = value;
-        cell.border = {
-          top: { style: "thin" },
-          left: { style: "thin" },
-          bottom: { style: "thin" },
-          right: { style: "thin" },
-        };
+      certificates.forEach((cert, index) => {
+        const row = certStartRow + index;
+        worksheet.getCell(`B${row}`).value = cert.certificateName || "";
+        worksheet.getCell(`C${row}`).value = cert.certificateNumber || "";
+        worksheet.getCell(`D${row}`).value = cert.dateOfIssue || "";
+        worksheet.getCell(`E${row}`).value = cert.dateOfExpiry || "";
       });
-      currentRow++;
-    });
+    }
 
     const buffer = await workbook.xlsx.writeBuffer();
     return new Blob([buffer], {
@@ -519,139 +392,64 @@ async function generateSkieronCV(crew: CrewMember): Promise<Blob> {
     });
   } catch (error) {
     console.error("Error generating Skeiron CV:", error);
-    // Fallback to Word format if Excel generation fails
+    // Fallback to ISC format if template fails
     return generateISCFormatCV(crew, "Skeiron");
   }
 }
 
 /**
  * Generate Vallianz format CV (Excel-based)
- * Creates CV from scratch without relying on templates
  */
 async function generateVallianzCV(crew: CrewMember): Promise<Blob> {
   try {
     // Import ExcelJS dynamically
     const ExcelJS = (await import("exceljs")).default;
 
-    const workbook = new ExcelJS.Workbook();
+    // Load the Vallianz template
+    const response = await fetch("/templates/VALLIANZ_APPLICANT_CV.xlsx");
     
-    // Personal Information Sheet
-    const personalSheet = workbook.addWorksheet("PERSONAL INFORMATION");
-    personalSheet.columns = [
-      { width: 5 },
-      { width: 30 },
-      { width: 35 },
-    ];
+    if (!response.ok) {
+      throw new Error(`Failed to load template: ${response.statusText}`);
+    }
+    
+    const arrayBuffer = await response.arrayBuffer();
 
-    // Title
-    personalSheet.mergeCells("A1:C1");
-    const titleCell = personalSheet.getCell("A1");
-    titleCell.value = "VALLIANZ - CREW APPLICANT CV";
-    titleCell.font = { size: 16, bold: true, color: { argb: "FFFFFFFF" } };
-    titleCell.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FF002060" },
-    };
-    titleCell.alignment = { vertical: "middle", horizontal: "center" };
-    personalSheet.getRow(1).height = 30;
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(arrayBuffer);
 
-    personalSheet.addRow([]);
-    personalSheet.addRow([]);
+    const personalInfoSheet = workbook.getWorksheet("PERSONAL INFORMATION");
+    const seaServiceSheet = workbook.getWorksheet("SEA SERVICE");
 
-    // Personal Information
-    const personalInfo = [
-      ["Full Name:", crew.fullName || ""],
-      ["Date of Birth:", crew.dateOfBirth || ""],
-      ["Place of Birth:", crew.placeOfBirth || ""],
-      ["Nationality:", crew.nationality || ""],
-      ["Marital Status:", crew.maritalStatus || ""],
-      ["Height (cm):", crew.height?.toString() || ""],
-      ["Weight (kg):", crew.weight?.toString() || ""],
-      ["Email Address:", crew.emailAddress || ""],
-      ["Mobile Number:", crew.mobileNumber || ""],
-      ["Position Applied:", crew.presentRank || ""],
-    ];
+    if (personalInfoSheet) {
+      // Fill in personal information
+      // NOTE: Verify these cell addresses against your template
+      personalInfoSheet.getCell("C5").value = crew.fullName || "";
+      personalInfoSheet.getCell("C6").value = crew.dateOfBirth || "";
+      personalInfoSheet.getCell("C7").value = crew.placeOfBirth || "";
+      personalInfoSheet.getCell("C8").value = crew.nationality || "";
+      personalInfoSheet.getCell("C9").value = crew.maritalStatus || "";
+      personalInfoSheet.getCell("C10").value = crew.height || "";
+      personalInfoSheet.getCell("C11").value = crew.weight || "";
+      personalInfoSheet.getCell("C12").value = crew.emailAddress || "";
+      personalInfoSheet.getCell("C13").value = crew.mobileNumber || "";
+      personalInfoSheet.getCell("C14").value = crew.presentRank || "";
+    }
 
-    let row = 4;
-    personalInfo.forEach(([label, value]) => {
-      personalSheet.getCell(`B${row}`).value = label;
-      personalSheet.getCell(`B${row}`).font = { bold: true };
-      personalSheet.getCell(`C${row}`).value = value;
-      row++;
-    });
+    if (seaServiceSheet) {
+      // Fill in sea service data
+      const vessels = crew.vesselExperience || [];
+      const startRow = 5; // Adjust based on template
 
-    // Sea Service Sheet
-    const seaServiceSheet = workbook.addWorksheet("SEA SERVICE");
-    seaServiceSheet.columns = [
-      { width: 5 },
-      { width: 20 },
-      { width: 15 },
-      { width: 15 },
-      { width: 25 },
-      { width: 12 },
-      { width: 12 },
-    ];
-
-    // Title
-    seaServiceSheet.mergeCells("A1:G1");
-    const ssTitle = seaServiceSheet.getCell("A1");
-    ssTitle.value = "SEA SERVICE EXPERIENCE";
-    ssTitle.font = { size: 14, bold: true, color: { argb: "FFFFFFFF" } };
-    ssTitle.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FF002060" },
-    };
-    ssTitle.alignment = { vertical: "middle", horizontal: "center" };
-    seaServiceSheet.getRow(1).height = 25;
-
-    seaServiceSheet.addRow([]);
-    seaServiceSheet.addRow([]);
-
-    // Headers
-    const headers = ["Vessel Name", "Type", "Rank", "Principal", "Sign On", "Sign Off"];
-    headers.forEach((header, index) => {
-      const cell = seaServiceSheet.getCell(4, index + 2);
-      cell.value = header;
-      cell.font = { bold: true };
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FFD9E1F2" },
-      };
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
-    });
-
-    // Data
-    const vessels = crew.vesselExperience || [];
-    vessels.forEach((vessel, vIndex) => {
-      const rowNum = 5 + vIndex;
-      const data = [
-        vessel.vesselName || "",
-        vessel.vesselType || "",
-        vessel.rank || "",
-        vessel.principal || "",
-        vessel.signedOn || "",
-        vessel.signedOff || "",
-      ];
-      
-      data.forEach((value, index) => {
-        const cell = seaServiceSheet.getCell(rowNum, index + 2);
-        cell.value = value;
-        cell.border = {
-          top: { style: "thin" },
-          left: { style: "thin" },
-          bottom: { style: "thin" },
-          right: { style: "thin" },
-        };
+      vessels.forEach((vessel, index) => {
+        const row = startRow + index;
+        seaServiceSheet.getCell(`B${row}`).value = vessel.vesselName || "";
+        seaServiceSheet.getCell(`C${row}`).value = vessel.vesselType || "";
+        seaServiceSheet.getCell(`D${row}`).value = vessel.rank || "";
+        seaServiceSheet.getCell(`E${row}`).value = vessel.principal || "";
+        seaServiceSheet.getCell(`F${row}`).value = vessel.signedOn || "";
+        seaServiceSheet.getCell(`G${row}`).value = vessel.signedOff || "";
       });
-    });
+    }
 
     const buffer = await workbook.xlsx.writeBuffer();
     return new Blob([buffer], {
@@ -659,7 +457,7 @@ async function generateVallianzCV(crew: CrewMember): Promise<Blob> {
     });
   } catch (error) {
     console.error("Error generating Vallianz CV:", error);
-    // Fallback to Word format if Excel generation fails
+    // Fallback to ISC format if template fails
     return generateISCFormatCV(crew, "Vallianz");
   }
 }
