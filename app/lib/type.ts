@@ -47,6 +47,10 @@ export type VesselExperience = {
 };
 
 export interface CrewMember {
+  address: any;
+  position: any;
+  contactNumber: any;
+  email: any;
   shoeSize: string;
   nearestAirport: string;
   overallSize: string;
@@ -110,6 +114,9 @@ export interface CrewMember {
 
   // Documents
   documents: {
+    reference: any;
+    refNo: any;
+    documentNumber: any;
     documentNo: any;
     number: any;
     referenceNo: any;
