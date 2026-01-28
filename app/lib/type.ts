@@ -40,6 +40,7 @@ export type VesselExperience = {
 };
 
 export interface CrewMember {
+  documentStatus: string;
   medicals: any;
   // System fields
   id: string;

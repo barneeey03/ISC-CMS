@@ -10,12 +10,7 @@ import { CrewMember } from "@/app/lib/type";
 import { Eye, Edit2, Trash2, Download, Search } from "lucide-react";
 import jsPDF from "jspdf";
 
-import {
-  updateCrewInFirestore,
-  updateCrewDatabaseInFirestore,
-  deleteCrewFromFirestore,
-} from "@/app/lib/crewservice";
-
+import { updateCrewInFirestore } from "@/app/lib/crewservice";
 import { onSnapshot, collection } from "firebase/firestore";
 import { db } from "@/app/lib/firebase";
 
@@ -31,19 +26,11 @@ export default function SuperAdminCrewApplications() {
   const [crews, setCrews] = useState<CrewMember[]>([]);
   const [selectedCrew, setSelectedCrew] = useState<CrewMember | null>(null);
   const [editCrew, setEditCrew] = useState<CrewMember | null>(null);
-
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<CrewStatus | "all">("all");
-
-  const [highlightFilter, setHighlightFilter] = useState<
-    "all" | "highlighted"
-  >("all");
-
+  const [highlightFilter, setHighlightFilter] = useState<"all" | "highlighted">("all");
   const [page, setPage] = useState(1);
   const perPage = 8;
-
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     const crewRef = collection(db, "crewApplications");
@@ -53,51 +40,36 @@ export default function SuperAdminCrewApplications() {
         ...(doc.data() as any),
         id: doc.id,
       }));
-      setCrews(list);
+      const passedCrews = list.filter((crew) => crew.documentStatus === "passed");
+      setCrews(passedCrews);
     });
 
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    setPage(1);
-  }, [searchQuery, statusFilter, highlightFilter]);
+  useEffect(() => setPage(1), [searchQuery, statusFilter, highlightFilter]);
 
   /* ============================
      ACTION HANDLERS
   ============================ */
-    const handleApprove = async (id: string) => {
-        await updateCrewInFirestore(id, { status: "approved" });
-        setSelectedCrew(null);
-        setStatusFilter("all");
-      };
+  const handleApprove = async (id: string) => {
+    await updateCrewInFirestore(id, { status: "approved" });
+    setSelectedCrew(null);
+    setStatusFilter("all");
+  };
 
-      const handleDisapprove = async (id: string, reconsider?: boolean) => {
-        await updateCrewInFirestore(id, {
-          status: reconsider ? "pooled" : "disapproved",
-        });
-        setSelectedCrew(null);
-        setStatusFilter("all");
-      };
+  const handleDisapprove = async (id: string) => {
+    await updateCrewInFirestore(id, { status: "disapproved" });
+    setSelectedCrew(null);
+    setStatusFilter("all");
+  };
 
-      const handleProposed = async (id: string) => {
-        await updateCrewInFirestore(id, { status: "proposed" });
-        setSelectedCrew(null);
-        setStatusFilter("all");
-      };
+  const handleProposed = async (id: string) => {
+    await updateCrewInFirestore(id, { status: "proposed" });
+    setSelectedCrew(null);
+    setStatusFilter("all");
+  };
 
-      const handlePooled = async (id: string) => {
-        await updateCrewInFirestore(id, { status: "pooled" });
-        setSelectedCrew(null);
-        setStatusFilter("all");
-      };
-
-      const confirmDelete = async () => {
-        if (!deleteTargetId) return;
-        await deleteCrewFromFirestore(deleteTargetId);
-        setShowDeleteConfirm(false);
-        setDeleteTargetId(null);
-      };
   /* ============================
      HELPERS
   ============================ */
@@ -105,27 +77,21 @@ export default function SuperAdminCrewApplications() {
     if (!dob) return "—";
     const birth = new Date(dob);
     if (isNaN(birth.getTime())) return "—";
-    return Math.abs(
-      new Date(Date.now() - birth.getTime()).getUTCFullYear() - 1970
-    );
+    return Math.abs(new Date(Date.now() - birth.getTime()).getUTCFullYear() - 1970);
   };
 
-  // ✅ NEW: Get Latest Vessel Experience
   const getLatestVessel = (crew: CrewMember) => {
     const vessels = crew.vesselExperience || [];
-
     const sorted = [...vessels].sort((a, b) => {
       const aDate = a.signedOn ? new Date(a.signedOn).getTime() : 0;
       const bDate = b.signedOn ? new Date(b.signedOn).getTime() : 0;
       return bDate - aDate;
     });
-
     return sorted[0];
   };
 
   const getVesselInfo = (crew: CrewMember) => {
     const lastVessel = getLatestVessel(crew);
-
     return {
       vesselType: lastVessel?.vesselType || crew.vesselType || "—",
       vesselName: lastVessel?.vesselName || "—",
@@ -138,12 +104,9 @@ export default function SuperAdminCrewApplications() {
   const calculateDaysOnboard = (crew: CrewMember) => {
     const last = getLatestVessel(crew);
     if (!last?.signedOn) return null;
-
     const start = new Date(last.signedOn).getTime();
     const end = last.signedOff ? new Date(last.signedOff).getTime() : Date.now();
-
-    const diff = Math.abs(end - start);
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return Math.ceil(Math.abs(end - start) / (1000 * 60 * 60 * 24));
   };
 
   /* ============================
@@ -159,10 +122,7 @@ export default function SuperAdminCrewApplications() {
       );
     });
 
-    if (statusFilter !== "all") {
-      list = list.filter((c) => c.status === statusFilter);
-    }
-
+    if (statusFilter !== "all") list = list.filter((c) => c.status === statusFilter);
     if (highlightFilter === "highlighted") {
       list = list.filter((crew) => {
         const days = calculateDaysOnboard(crew);
@@ -174,10 +134,7 @@ export default function SuperAdminCrewApplications() {
   }, [crews, searchQuery, statusFilter, highlightFilter]);
 
   const totalPages = Math.ceil(filteredCrews.length / perPage);
-  const paginatedCrews = filteredCrews.slice(
-    (page - 1) * perPage,
-    page * perPage
-  );
+  const paginatedCrews = filteredCrews.slice((page - 1) * perPage, page * perPage);
 
   /* ============================
      PDF EXPORT
@@ -185,10 +142,9 @@ export default function SuperAdminCrewApplications() {
   const exportPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(14);
-    doc.text("Crew Applications Report", 14, 20);
+    doc.text("Crew Applications Report (Passed Only)", 14, 20);
 
     let y = 35;
-
     paginatedCrews.forEach((crew, index) => {
       const vessel = getVesselInfo(crew);
       const days = calculateDaysOnboard(crew);
@@ -203,7 +159,6 @@ export default function SuperAdminCrewApplications() {
       doc.text(`Signed On: ${vessel.signedOn}`, 14, y + 30);
       doc.text(`Signed Off: ${vessel.signedOff}`, 14, y + 36);
       doc.text(`Days Onboard: ${days ?? "—"}`, 14, y + 42);
-
       doc.text(`Age: ${getAge(crew.dateOfBirth)}`, 14, y + 48);
       doc.text(`Email: ${crew.emailAddress}`, 14, y + 54);
       doc.text(
@@ -226,7 +181,7 @@ export default function SuperAdminCrewApplications() {
       }
     });
 
-    doc.save("crew_applications_report.pdf");
+    doc.save("crew_applications_report_passed.pdf");
   };
 
   /* ============================
@@ -236,14 +191,18 @@ export default function SuperAdminCrewApplications() {
     <ProtectedRoute requiredRole="super-admin">
       <div className="flex">
         <SuperAdminSidebar />
-
         <div className="flex-1 min-h-screen lg:ml-64 bg-linear-to-b from-[#F4F9FF] to-[#FFFFFF]">
           {/* HEADER */}
           <div className="fixed top-0 left-0 right-0 z-20 lg:ml-64 bg-white border-b shadow-sm">
             <div className="flex justify-between items-center px-6 py-4">
-              <h1 className="text-xl font-semibold tracking-tight text-[#002060]">
-                Crew Applications
-              </h1>
+              <div>
+                <h1 className="text-xl font-semibold tracking-tight text-[#002060]">
+                  Crew Applications (Passed Documents Only)
+                </h1>
+                <p className="text-xs text-gray-500 mt-1">
+                  Showing only crews with passed document status
+                </p>
+              </div>
             </div>
           </div>
 
@@ -265,9 +224,7 @@ export default function SuperAdminCrewApplications() {
               <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg shadow-sm border">
                 <select
                   value={statusFilter}
-                  onChange={(e) =>
-                    setStatusFilter(e.target.value as CrewStatus | "all")
-                  }
+                  onChange={(e) => setStatusFilter(e.target.value as CrewStatus | "all")}
                   className="w-full outline-none text-sm text-gray-700"
                 >
                   <option value="all">All Status</option>
@@ -280,13 +237,10 @@ export default function SuperAdminCrewApplications() {
                 </select>
               </div>
 
-              {/* HIGHLIGHT DROPDOWN */}
               <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg shadow-sm border">
                 <select
                   value={highlightFilter}
-                  onChange={(e) =>
-                    setHighlightFilter(e.target.value as "all" | "highlighted")
-                  }
+                  onChange={(e) => setHighlightFilter(e.target.value as "all" | "highlighted")}
                   className="w-full outline-none text-sm text-gray-700"
                 >
                   <option value="all">All Crew</option>
@@ -295,7 +249,6 @@ export default function SuperAdminCrewApplications() {
               </div>
 
               <div className="hidden md:block" />
-
               <div className="flex justify-end">
                 <button
                   onClick={exportPDF}
@@ -307,6 +260,15 @@ export default function SuperAdminCrewApplications() {
               </div>
             </div>
 
+            {/* INFO BADGE */}
+            {filteredCrews.length === 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-blue-700">
+                  No crews with "passed" document status found.
+                </p>
+              </div>
+            )}
+
             {/* TABLE */}
             <div className="bg-white rounded-xl shadow border overflow-hidden">
               <div className="max-h-130 overflow-y-auto">
@@ -314,117 +276,63 @@ export default function SuperAdminCrewApplications() {
                   <thead className="bg-blue-200 sticky top-0">
                     <tr>
                       {[
-                        "Rank",
-                        "Name",
-                        "Vessel Type",
-                        "Vessel Name",
-                        "Principal",
-                        "Signed Off",
-                        "Age",
-                        "Email",
-                        "Status",
-                        "Remarks",
-                        "Action",
+                        "Rank", "Name", "Vessel Type", "Vessel Name",
+                        "Principal", "Signed Off", "Age", "Email",
+                        "Status", "Remarks", "Action"
                       ].map((h) => (
-                        <th
-                          key={h}
-                          className="px-3 py-2 text-xs font-semibold text-center"
-                        >
-                          {h}
-                        </th>
+                        <th key={h} className="px-3 py-2 text-xs font-semibold text-center">{h}</th>
                       ))}
                     </tr>
                   </thead>
-
                   <tbody>
-                    {paginatedCrews.map((crew) => {
+                    {paginatedCrews.length === 0 ? (
+                      <tr>
+                        <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
+                          No crew members with passed document status found
+                        </td>
+                      </tr>
+                    ) : paginatedCrews.map((crew) => {
                       const vessel = getVesselInfo(crew);
                       const days = calculateDaysOnboard(crew);
                       const isHighlighted = days !== null && days < 70;
 
                       return (
-                        <tr
-                          key={crew.id}
-                          className={`hover:bg-blue-50 ${
-                            isHighlighted
-                              ? "bg-red-100 border-l-4 border-red-600"
-                              : ""
-                          }`}
-                        >
-                          <td className="px-3 py-2 text-center">
-                            {crew.presentRank}
-                          </td>
-                          <td className="px-3 py-2 text-center font-medium">
-                            {crew.fullName}
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            {vessel.vesselType}
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            {vessel.vesselName}
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            {vessel.principal}
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            {vessel.signedOff}
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            {getAge(crew.dateOfBirth)}
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            {crew.emailAddress}
-                          </td>
+                        <tr key={crew.id} className={`hover:bg-blue-50 ${isHighlighted ? "bg-red-100 border-l-4 border-red-600" : ""}`}>
+                          <td className="px-3 py-2 text-center">{crew.presentRank}</td>
+                          <td className="px-3 py-2 text-center font-medium">{crew.fullName}</td>
+                          <td className="px-3 py-2 text-center">{vessel.vesselType}</td>
+                          <td className="px-3 py-2 text-center">{vessel.vesselName}</td>
+                          <td className="px-3 py-2 text-center">{vessel.principal}</td>
+                          <td className="px-3 py-2 text-center">{vessel.signedOff}</td>
+                          <td className="px-3 py-2 text-center">{getAge(crew.dateOfBirth)}</td>
+                          <td className="px-3 py-2 text-center">{crew.emailAddress}</td>
 
                           <td className="px-3 py-2 text-center">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-semibold
-                              ${
-                                crew.status === "approved" ||
-                                crew.status === "assigned"
-                                  ? "bg-green-100 text-green-700"
-                                  : crew.status === "pending"
-                                  ? "bg-orange-400 text-gray-900"
-                                  : crew.status === "proposed"
-                                  ? "bg-yellow-100 text-yellow-700"
-                                  : crew.status === "pooled"
-                                  ? "bg-orange-100 text-orange-700"
-                                  : "bg-red-100 text-red-700"
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold
+                              ${crew.status === "approved" || crew.status === "assigned" ? "bg-green-100 text-green-700" :
+                                crew.status === "pending" ? "bg-orange-400 text-gray-900" :
+                                crew.status === "proposed" ? "bg-yellow-100 text-yellow-700" :
+                                crew.status === "pooled" ? "bg-orange-100 text-orange-700" :
+                                "bg-red-100 text-red-700"
                               }`}
                             >
-                              {crew.status === "assigned"
-                                ? "ACTIVE"
-                                : crew.status.toUpperCase()}
+                              {crew.status === "assigned" ? "ACTIVE" : crew.status.toUpperCase()}
                             </span>
                           </td>
 
-                          <td className="px-3 py-2 text-center">
-                            {crew.remarks || "—"}
-                          </td>
+                          <td className="px-3 py-2 text-center">{crew.remarks || "—"}</td>
 
                           <td className="px-3 py-2">
                             <div className="flex gap-2 justify-center">
-                              <button
-                                onClick={() => setSelectedCrew(crew)}
-                                className="p-2 bg-blue-100 rounded-lg"
-                              >
+                              <button onClick={() => setSelectedCrew(crew)} className="p-2 bg-blue-100 rounded-lg">
                                 <Eye className="w-4 h-4" />
                               </button>
 
-                              <button
-                                onClick={() => setEditCrew(crew)}
-                                className="p-2 bg-green-100 rounded-lg"
-                              >
+                              <button onClick={() => setEditCrew(crew)} className="p-2 bg-green-100 rounded-lg">
                                 <Edit2 className="w-4 h-4" />
                               </button>
 
-                              <button
-                                onClick={() => {
-                                  setDeleteTargetId(crew.id);
-                                  setShowDeleteConfirm(true);
-                                }}
-                                className="p-2 bg-red-100 rounded-lg"
-                              >
+                              <button onClick={() => handleProposed(crew.id)} className="p-2 bg-yellow-100 rounded-lg">
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
@@ -438,31 +346,27 @@ export default function SuperAdminCrewApplications() {
             </div>
 
             {/* PAGINATION */}
-            <div className="flex justify-between items-center mt-6">
-              <span className="text-sm text-gray-600">
-                Page {page} of {totalPages}
-              </span>
+            {totalPages > 0 && (
+              <div className="flex justify-between items-center mt-6">
+                <span className="text-sm text-gray-600">
+                  Page {page} of {totalPages} • Showing {filteredCrews.length} passed crew{filteredCrews.length !== 1 ? "s" : ""}
+                </span>
 
-              <div className="flex gap-2">
-                <button
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => p - 1)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Previous
-                </button>
-
-                <button
-                  disabled={page === totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Next
-                </button>
+                <div className="flex gap-2">
+                  <button disabled={page === 1} onClick={() => setPage(p => p-1)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50">
+                    Previous
+                  </button>
+                  <button disabled={page === totalPages} onClick={() => setPage(p => p+1)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50">
+                    Next
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
+          {/* CREW DETAILS MODAL */}
           {selectedCrew && (
             <CrewDetailsModal
               crew={selectedCrew}
@@ -470,10 +374,10 @@ export default function SuperAdminCrewApplications() {
               onApprove={handleApprove}
               onDisapprove={handleDisapprove}
               onProposed={handleProposed}
-              onPooled={handlePooled}
             />
           )}
 
+          {/* EDIT CREW FORM */}
           {editCrew && (
             <CrewApplicationForm
               mode="edit"
@@ -481,28 +385,6 @@ export default function SuperAdminCrewApplications() {
               onClose={() => setEditCrew(null)}
               onSuccess={() => setEditCrew(null)}
             />
-          )}
-
-          {showDeleteConfirm && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white p-6 rounded-2xl">
-                <h2 className="font-bold mb-4">Delete Confirmation</h2>
-                <div className="flex justify-end gap-3">
-                  <button
-                    onClick={() => setShowDeleteConfirm(false)}
-                    className="px-4 py-2 bg-gray-200 rounded-lg"
-                  >
-                    No
-                  </button>
-                  <button
-                    onClick={confirmDelete}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg"
-                  >
-                    Yes
-                  </button>
-                </div>
-              </div>
-            </div>
           )}
         </div>
       </div>
