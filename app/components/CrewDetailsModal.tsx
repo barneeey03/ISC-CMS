@@ -286,7 +286,7 @@ export function CrewDetailsModal({
                         <td className="px-4 py-2 border-b">{c.name || "—"}</td>
                         <td className="px-4 py-2 border-b">{c.placeIssued || "—"}</td>
                         <td className="px-4 py-2 border-b">{c.dateIssued || "—"}</td>
-                        <td className="px-4 py-2 border-b">{c.expiryDate || "—"}</td> {/* ✅ Now uses expiryDate */}
+                        <td className="px-4 py-2 border-b">{c.expiryDate || "—"}</td> 
                       </tr>
                     ))}
                   </tbody>

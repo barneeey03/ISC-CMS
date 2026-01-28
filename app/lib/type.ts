@@ -10,6 +10,7 @@ export type CrewMemberStatus =
   | "assigned";
 
 export type Certificate = {
+  dateExpiry: string;
   certificateName: string;
   certificateNumber: string;
   dateOfIssue: string;
