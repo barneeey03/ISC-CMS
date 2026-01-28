@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { AdminSidebar } from "@/app/components/AdminSidebar";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 import { CrewApplicationForm } from "@/app/components/CrewApplicationForm";
@@ -18,6 +18,20 @@ import {
 import { onSnapshot, collection } from "firebase/firestore";
 import { db } from "@/app/lib/firebase";
 
+function calculateDaysOnboard(crew: CrewMember): number | null {
+  if (!crew?.dateJoined) return null;
+
+  const joinedDate = new Date(crew.dateJoined);
+  if (isNaN(joinedDate.getTime())) return null;
+
+  const today = new Date();
+  const diffTime = today.getTime() - joinedDate.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  return diffDays;
+}
+
+
 /* ============================
    TYPES
 ============================ */
@@ -26,7 +40,7 @@ type ExamStatus = "all" | "passed" | "failed" | "pending" | "on-hold";
 /* ============================
    ASYNC LOADERS
 ============================ */
-const fetchRanks = async () =>
+const fetchRanks = async (): Promise<string[]> =>
   Promise.resolve([
     "Master","Chief Officer","2nd Officer","3rd Officer",
     "BOSUN","AB","OS","Deck Cadet",
@@ -34,14 +48,14 @@ const fetchRanks = async () =>
     "Oiler","WPR","Engine Cadet","Messman","Chief Cook","Fitter","ETO","ETR",
   ]);
 
-const fetchPrincipals = async () =>
+const fetchPrincipals = async (): Promise<string[]> =>
   Promise.resolve([
     "Skeiron","LMJ Ship Management LLC","Grand Asian Shipping Lines",
     "ISC","Guangzhou Huayang Maritime Co., LTD.","Vallianz",
     "Dynamic Marine Services","Molyneux Marine",
   ]);
 
-const fetchVesselTypes = async () =>
+const fetchVesselTypes = async (): Promise<string[]> =>
   Promise.resolve([
     "Container","Bulk Carrier","Oil Tanker","LPG","AHTS",
     "Crew Boat","Heavy Lift","General Cargo",
@@ -50,50 +64,66 @@ const fetchVesselTypes = async () =>
 /* ============================
    ASYNC MULTI SELECT
 ============================ */
+interface AsyncMultiSelectProps {
+  label: string;
+  selected: string[];
+  onChange: (val: string[]) => void;
+  loader: () => Promise<string[]>;
+}
+
 const AsyncMultiSelect = ({
   label,
   selected,
   onChange,
   loader,
-}: any) => {
+}: AsyncMultiSelectProps) => {
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<string[]>([]);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    if (open && options.length === 0) loader().then(setOptions);
-  }, [open]);
+    if (open && options.length === 0) {
+      loader().then(setOptions);
+    }
+  }, [open, loader, options.length]);
 
-  const toggle = (val: string) =>
+  const toggle = (val: string) => {
     onChange(
       selected.includes(val)
-        ? selected.filter((v: string) => v !== val)
+        ? selected.filter((v) => v !== val)
         : [...selected, val]
     );
+  };
 
   return (
-    <div className="relative bg-white border rounded-lg shadow-sm">
+    <div className="relative bg-white border border-gray-300 rounded shadow-sm">
       <button
-        onClick={() => setOpen(!open)}
-        className="w-full px-4 py-3 text-left text-sm"
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full px-4 py-3 text-left text-sm font-medium"
       >
-        {label} {selected.length > 0 && `(${selected.length})`}
+        {label}
+        {selected.length > 0 && ` (${selected.length})`}
       </button>
 
       {open && (
-        <div className="absolute z-30 w-full bg-white border rounded-lg shadow-lg p-2 max-h-64 overflow-y-auto">
+        <div className="absolute z-30 w-full bg-white border border-gray-300 rounded shadow-lg p-2 max-h-64 overflow-y-auto">
           <input
-            className="w-full mb-2 px-2 py-1 border rounded text-sm"
+            className="w-full mb-2 px-2 py-1 border border-gray-300 rounded text-sm"
             placeholder={`Search ${label}...`}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+
           {options
             .filter((o) =>
               o.toLowerCase().includes(search.toLowerCase())
             )
             .map((opt) => (
-              <label key={opt} className="flex gap-2 py-1 text-sm">
+              <label
+                key={opt}
+                className="flex gap-2 py-1 text-sm font-medium cursor-pointer"
+              >
                 <input
                   type="checkbox"
                   checked={selected.includes(opt)}
@@ -111,10 +141,15 @@ const AsyncMultiSelect = ({
 /* ============================
    CHIP
 ============================ */
-const Chip = ({ label, onRemove }: any) => (
-  <span className="flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
+interface ChipProps {
+  label: string;
+  onRemove: () => void;
+}
+
+const Chip = ({ label, onRemove }: ChipProps) => (
+  <span className="flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
     {label}
-    <button onClick={onRemove}>✕</button>
+    <button onClick={onRemove} className="font-bold">✕</button>
   </span>
 );
 
@@ -140,7 +175,6 @@ export default function CrewApplications() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
-  // NEW STATES FOR RECONSIDER
   const [showReconsiderConfirm, setShowReconsiderConfirm] = useState(false);
   const [reconsiderTargetId, setReconsiderTargetId] = useState<string | null>(null);
 
@@ -149,18 +183,16 @@ export default function CrewApplications() {
   ============================ */
   useEffect(() => {
     const ref = collection(db, "crewApplications");
-    return onSnapshot(ref, (snap) =>
-      setCrews(snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })))
-    );
+    return onSnapshot(ref, (snap) => {
+      setCrews(
+        snap.docs.map((d) => ({ ...(d.data() as CrewMember), id: d.id }))
+      );
+    });
   }, []);
 
-  useEffect(() => setPage(1), [
-    searchQuery,
-    examStatus,
-    rankFilter,
-    principalFilter,
-    vesselTypeFilter,
-  ]);
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, examStatus, rankFilter, principalFilter, vesselTypeFilter]);
 
   /* ============================
      HELPERS
@@ -189,14 +221,6 @@ export default function CrewApplications() {
     };
   };
 
-  const calculateDaysOnboard = (crew: CrewMember) => {
-    const v = getLatestVessel(crew);
-    if (!v?.signedOn) return null;
-    const start = new Date(v.signedOn).getTime();
-    const end = v.signedOff ? new Date(v.signedOff).getTime() : Date.now();
-    return Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-  };
-
   /* ============================
      FILTERING
   ============================ */
@@ -204,49 +228,15 @@ export default function CrewApplications() {
     return crews.filter((crew) => {
       const vessel = getVesselInfo(crew);
 
-      if (
-        examStatus !== "all" &&
-        (examStatus === "passed"
-          ? crew.status !== "passed"
-          : examStatus === "failed"
-          ? crew.status !== "failed"
-          : examStatus === "pending"
-          ? crew.status !== "pending"
-          : crew.status !== "on-hold")
-      )
-        return false;
-
-      if (rankFilter.length && !rankFilter.includes(crew.presentRank))
-        return false;
-
-      if (
-        principalFilter.length &&
-        !principalFilter.includes(vessel.principal)
-      )
-        return false;
-
-      if (
-        vesselTypeFilter.length &&
-        !vesselTypeFilter.includes(vessel.vesselType)
-      )
-        return false;
-
-      if (
-        searchQuery &&
-        !crew.fullName.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-        return false;
+      if (examStatus !== "all" && crew.status !== examStatus) return false;
+      if (rankFilter.length && !rankFilter.includes(crew.presentRank)) return false;
+      if (principalFilter.length && !principalFilter.includes(vessel.principal)) return false;
+      if (vesselTypeFilter.length && !vesselTypeFilter.includes(vessel.vesselType)) return false;
+      if (searchQuery && !crew.fullName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
 
       return true;
     });
-  }, [
-    crews,
-    examStatus,
-    rankFilter,
-    principalFilter,
-    vesselTypeFilter,
-    searchQuery,
-  ]);
+  }, [crews, examStatus, rankFilter, principalFilter, vesselTypeFilter, searchQuery]);
 
   const paginatedCrews = filteredCrews.slice(
     (page - 1) * perPage,
@@ -263,77 +253,72 @@ export default function CrewApplications() {
   };
 
   /* ============================
-     APPROVE / DISAPPROVE
-  ============================
-  */
-  const handleApprove = async (id: string, remarks?: string) => {
-    await updateCrewInFirestore(id, {
-      status: "passed",
-      remarks: remarks || "Passed",
-    });
-  };
+     ACTIONS
+  ============================ */
+  const handleApprove = async (id: string) =>
+    updateCrewInFirestore(id, { status: "passed", remarks: "Passed" });
 
-  const handleDisapprove = async (id: string, remarks?: string) => {
-    await updateCrewInFirestore(id, {
-      status: "failed",
-      remarks: remarks || "Failed",
-    });
-  };
+  const handleDisapprove = async (id: string) =>
+    updateCrewInFirestore(id, { status: "failed", remarks: "Failed" });
 
-  // NEW FUNCTION FOR RECONSIDER
-  const handleReconsider = async (id: string) => {
-    await updateCrewInFirestore(id, {
+  const handleReconsider = async (id: string) =>
+    updateCrewInFirestore(id, {
       status: "on-hold",
       remarks: "Reconsidered - On Hold",
     });
-  };
 
-  /* ============================
-     RENDER
-  ============================ */
   return (
     <ProtectedRoute requiredRole="admin">
-      <div className="flex">
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        
+        * {
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+          letter-spacing: -0.01em;
+        }
+      `}</style>
+
+      <div className="flex min-h-screen bg-gray-100">
         <AdminSidebar />
 
-        <div className="flex-1 min-h-screen lg:ml-64 bg-gray-50">
+        <div className="flex-1 lg:ml-64">
           {/* HEADER */}
-          <div className="fixed top-0 left-0 right-0 z-20 lg:ml-64 bg-white border-b shadow-sm">
-            <div className="flex justify-between items-center px-6 py-4">
-              <h1 className="text-xl font-semibold">Crew Applications</h1>
+          <div className="sticky top-0 z-30 bg-white border-b border-gray-300">
+            <div className="px-8 py-5 flex justify-between items-center">
+              <h1 className="text-2xl font-bold text-gray-900" style={{letterSpacing: '-0.02em'}}>Crew Applications</h1>
             </div>
           </div>
 
           {/* CONTENT */}
-          <div className="pt-24 px-6 pb-10">
+          <div className="p-8">
             {/* BUTTONS (TOP RIGHT) */}
-            <div className="flex justify-end gap-2 mb-4">
+            <div className="flex justify-end gap-2 mb-6">
               <button
                 onClick={exportPDF}
-                className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white rounded-lg"
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded text-sm font-semibold hover:bg-emerald-700 transition-colors"
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-4 h-4" strokeWidth={2} />
                 Export PDF
               </button>
 
               <button
                 onClick={() => setShowAddForm(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg"
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded text-sm font-semibold hover:bg-blue-700 transition-colors"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-4 h-4" strokeWidth={2} />
                 Add Crew
               </button>
             </div>
 
             {/* FILTER BAR */}
             <div className="grid grid-cols-1 md:grid-cols-8 gap-4 mb-3">
-              <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg border col-span-3 md:col-span-2">
-                <Search className="w-4 h-4 text-gray-400" />
+              <div className="flex items-center gap-2 px-4 py-3 bg-white rounded border border-gray-300 col-span-3 md:col-span-2">
+                <Search className="w-4 h-4 text-gray-400" strokeWidth={2} />
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search name..."
-                  className="w-full outline-none text-sm"
+                  className="w-full outline-none text-sm font-medium"
                 />
               </div>
 
@@ -342,7 +327,7 @@ export default function CrewApplications() {
                 onChange={(e) =>
                   setExamStatus(e.target.value as ExamStatus)
                 }
-                className="px-4 py-3 border rounded-lg text-sm bg-white col-span-2"
+                className="px-4 py-3 border border-gray-300 rounded text-sm font-medium bg-white col-span-2"
               >
                 <option value="all">All Status</option>
                 <option value="passed">Passed</option>
@@ -384,6 +369,7 @@ export default function CrewApplications() {
                   }
                 />
               ))}
+
               {principalFilter.map((p) => (
                 <Chip
                   key={p}
@@ -395,6 +381,7 @@ export default function CrewApplications() {
                   }
                 />
               ))}
+
               {vesselTypeFilter.map((v) => (
                 <Chip
                   key={v}
@@ -406,6 +393,7 @@ export default function CrewApplications() {
                   }
                 />
               ))}
+
               {examStatus !== "all" && (
                 <Chip
                   label={`Status: ${examStatus}`}
@@ -415,9 +403,9 @@ export default function CrewApplications() {
             </div>
 
             {/* TABLE */}
-            <div className="overflow-x-auto bg-white rounded-xl shadow">
+            <div className="overflow-x-auto bg-white rounded border border-gray-300 shadow">
               <table className="min-w-full text-sm">
-                <thead className="bg-[#002060] text-white">
+                <thead className="bg-gray-800 text-white">
                   <tr>
                     {[
                       "Name",
@@ -429,14 +417,14 @@ export default function CrewApplications() {
                       "Remarks",
                       "Action",
                     ].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left">
+                      <th key={h} className="px-5 py-3 text-left text-xs font-bold uppercase">
                         {h}
                       </th>
                     ))}
                   </tr>
                 </thead>
 
-                <tbody>
+                <tbody className="divide-y divide-gray-200">
                   {paginatedCrews.map((crew) => {
                     const vessel = getVesselInfo(crew);
                     const days = calculateDaysOnboard(crew);
@@ -445,65 +433,68 @@ export default function CrewApplications() {
                     return (
                       <tr
                         key={crew.id}
-                        className={`border-b hover:bg-gray-50 ${
+                        className={`hover:bg-gray-50 transition-colors ${
                           highlight
                             ? "bg-red-50 border-l-4 border-red-600"
                             : ""
                         }`}
                       >
-                        <td className="px-4 py-3 font-medium">
+                        <td className="px-5 py-3 font-semibold text-gray-900">
                           {crew.fullName}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-5 py-3 font-medium text-gray-700">
                           {crew.presentRank}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-5 py-3 text-gray-700">
                           {vessel.vesselType}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-5 py-3 text-gray-700">
                           {vessel.principal}
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-5 py-3 text-center font-medium text-gray-700">
                           {getAge(crew.dateOfBirth)}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-5 py-3">
                           <span
-                            className={`px-3 py-1 rounded-full text-xs
+                            className={`px-3 py-1 rounded-full text-xs font-semibold uppercase
                               ${
                                 crew.status === "passed"
-                                  ? "bg-green-100 text-green-700"
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                   : crew.status === "failed"
-                                  ? "bg-red-100 text-red-700"
+                                  ? "bg-red-50 text-red-700 border border-red-200"
                                   : crew.status === "pending"
-                                  ? "bg-blue-100 text-blue-700"
-                                  : "bg-yellow-100 text-yellow-700"
+                                  ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                  : "bg-blue-50 text-blue-700 border border-blue-200"
                               }`}
                           >
                             {crew.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-5 py-3 text-gray-600">
                           {crew.remarks || "—"}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-5 py-3">
                           <div className="flex gap-2">
                             <button
                               onClick={() => setSelectedCrew(crew)}
+                              className="p-1.5 hover:bg-gray-100 rounded transition-colors"
                             >
-                              <Eye size={16} />
+                              <Eye size={16} strokeWidth={2} />
                             </button>
                             <button
                               onClick={() => setEditCrew(crew)}
+                              className="p-1.5 hover:bg-gray-100 rounded transition-colors"
                             >
-                              <Edit2 size={16} />
+                              <Edit2 size={16} strokeWidth={2} />
                             </button>
                             <button
                               onClick={() => {
                                 setDeleteTargetId(crew.id);
                                 setShowDeleteConfirm(true);
                               }}
+                              className="p-1.5 hover:bg-gray-100 rounded transition-colors"
                             >
-                              <Trash2 size={16} />
+                              <Trash2 size={16} strokeWidth={2} />
                             </button>
 
                             {/* NEW RECONSIDER BUTTON */}
@@ -513,7 +504,7 @@ export default function CrewApplications() {
                                   setReconsiderTargetId(crew.id);
                                   setShowReconsiderConfirm(true);
                                 }}
-                                className="px-3 py-1 rounded bg-yellow-500 text-white text-xs"
+                                className="px-3 py-1 rounded bg-yellow-500 text-white text-xs font-semibold hover:bg-yellow-600 transition-colors"
                               >
                                 Reconsider
                               </button>
@@ -529,7 +520,7 @@ export default function CrewApplications() {
 
             {/* PAGINATION */}
             <div className="flex justify-between items-center mt-6">
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-gray-600 font-medium">
                 Page {page} of {Math.ceil(filteredCrews.length / perPage)}
               </span>
 
@@ -537,12 +528,14 @@ export default function CrewApplications() {
                 <button
                   disabled={page === 1}
                   onClick={() => setPage((p) => p - 1)}
+                  className="px-4 py-2 bg-white border border-gray-300 rounded text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Previous
                 </button>
                 <button
                   disabled={page * perPage >= filteredCrews.length}
                   onClick={() => setPage((p) => p + 1)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Next
                 </button>
@@ -580,14 +573,14 @@ export default function CrewApplications() {
           {/* DELETE CONFIRM */}
           {showDeleteConfirm && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white p-6 rounded-xl">
-                <h2 className="font-semibold mb-4">
+              <div className="bg-white p-6 rounded border border-gray-300">
+                <h2 className="font-bold text-lg mb-4 text-gray-900">
                   Delete this crew?
                 </h2>
                 <div className="flex justify-end gap-3">
                   <button
                     onClick={() => setShowDeleteConfirm(false)}
-                    className="px-4 py-2 bg-gray-200 rounded-lg"
+                    className="px-4 py-2 bg-white border border-gray-300 rounded text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     No
                   </button>
@@ -597,7 +590,7 @@ export default function CrewApplications() {
                       await deleteCrewFromFirestore(deleteTargetId);
                       setShowDeleteConfirm(false);
                     }}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg"
+                    className="px-4 py-2 bg-red-600 text-white rounded text-sm font-semibold hover:bg-red-700 transition-colors"
                   >
                     Yes
                   </button>
@@ -609,17 +602,17 @@ export default function CrewApplications() {
           {/* RECONSIDER CONFIRM (NEW) */}
           {showReconsiderConfirm && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white p-6 rounded-xl">
-                <h2 className="font-semibold mb-4">
+              <div className="bg-white p-6 rounded border border-gray-300">
+                <h2 className="font-bold text-lg mb-4 text-gray-900">
                   Reconsider this application?
                 </h2>
-                <p className="mb-4 text-sm text-gray-600">
+                <p className="mb-4 text-sm text-gray-600 font-medium">
                   Once confirmed, status will change to <b>On-Hold</b>.
                 </p>
                 <div className="flex justify-end gap-3">
                   <button
                     onClick={() => setShowReconsiderConfirm(false)}
-                    className="px-4 py-2 bg-gray-200 rounded-lg"
+                    className="px-4 py-2 bg-white border border-gray-300 rounded text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     No
                   </button>
@@ -629,7 +622,7 @@ export default function CrewApplications() {
                       await handleReconsider(reconsiderTargetId);
                       setShowReconsiderConfirm(false);
                     }}
-                    className="px-4 py-2 bg-yellow-500 text-white rounded-lg"
+                    className="px-4 py-2 bg-yellow-500 text-white rounded text-sm font-semibold hover:bg-yellow-600 transition-colors"
                   >
                     Yes
                   </button>

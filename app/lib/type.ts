@@ -47,6 +47,7 @@ export type VesselExperience = {
 };
 
 export interface CrewMember {
+  dateJoined: any;
   address: any;
   position: any;
   contactNumber: any;
