@@ -634,7 +634,7 @@ export default function CrewApplications() {
                     Yes
                   </button>
                 </div>
-              </div>
+              </div>          
             </div>
           )}
         </div>

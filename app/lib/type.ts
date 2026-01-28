@@ -7,6 +7,9 @@ export type CrewMemberStatus =
   | "assigned";
 
 export type Certificate = {
+  certificateNo: string;
+  expiryDate(expiryDate: any): { status: any; daysLeft: any; };
+  referenceNo: string;
   id: string;
   name: string;
   number: string;
@@ -34,6 +37,7 @@ export type VesselExperience = {
 };
 
 export interface CrewMember {
+  medicals: any;
   // System fields
   id: string;
   createdAt: string;

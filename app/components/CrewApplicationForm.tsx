@@ -10,8 +10,16 @@ import {
 import { addCrewToFirestore, updateCrewInFirestore } from "@/app/lib/crewservice";
 import { serverTimestamp } from "firebase/firestore";
 
-type CrewFormData = Omit<CrewMember, "id" | "createdAt" | "age"> & {
+type Medical = {
+  certificateType: string;
+  issuingClinic: string;
+  dateIssued: string;
+  expiryDate: string;
+};
+
+type CrewFormData = Omit<CrewMember, "id" | "createdAt" | "age" | "medicals"> & {
   age: string;
+  medicals: Medical[];
 };
 
 interface CrewApplicationFormProps {
@@ -133,6 +141,9 @@ export function CrewApplicationForm({
       expiryDate: "",
     },
 
+    // Medicals array for type compliance
+    medicals: [],
+
     // Additional fields
     rank: "",
     vesselType: "",
@@ -140,57 +151,66 @@ export function CrewApplicationForm({
   });
 
   useEffect(() => {
-    if (mode === "edit" && crew) {
-      setFormData((prev) => ({
-        ...prev,
-        ...crew,
-        age: crew.age ? String(crew.age) : "",
+  if (mode === "edit" && crew) {
+    setFormData((prev) => ({
+      ...prev,
+      ...crew,
+      age: crew.age ? String(crew.age) : "",
 
-        vesselExperience:
-          crew.vesselExperience?.map((v, index) => ({
-            id: v.id || `vexp-${Date.now()}-${index}`,
-            assignmentId: v.assignmentId || "",
-            manningCompany: v.manningCompany || "",
-            principal: v.principal || "",
-            rank: v.rank || "",
-            vesselName: v.vesselName || "",
-            flag: v.flag || "",
-            vesselType: v.vesselType || "",
-            grt: v.grt || "",
-            mainEngine: v.mainEngine || "",
-            tradingRoute: v.tradingRoute || "",
-            signedOn: v.signedOn || "",
-            signedOff: v.signedOff || "",
-            causeOfDischarge: v.causeOfDischarge || "",
-          })) || [],
+      // Vessel Experience
+      vesselExperience:
+        crew.vesselExperience?.map((v, index) => ({
+          id: v.id || `vexp-${Date.now()}-${index}`,
+          assignmentId: v.assignmentId || "",
+          manningCompany: v.manningCompany || "",
+          principal: v.principal || "",
+          rank: v.rank || "",
+          vesselName: v.vesselName || "",
+          flag: v.flag || "",
+          vesselType: v.vesselType || "",
+          grt: v.grt || "",
+          mainEngine: v.mainEngine || "",
+          tradingRoute: v.tradingRoute || "",
+          signedOn: v.signedOn || "",
+          signedOff: v.signedOff || "",
+          causeOfDischarge: v.causeOfDischarge || "",
+        })) || [],
 
-        certificates:
-          crew.certificates?.map((c, index) => ({
-            id: c.id || `cert-${Date.now()}-${index}`,
-            name: c.name || "",
-            number: c.number || "",
-            placeIssued: c.placeIssued || "",
-            trainingCenter: c.trainingCenter || "",
-            dateIssued: c.dateIssued || "",
-            validUntil: c.validUntil || "",
-          })) || [],
+      // Certificates
+      certificates:
+        crew.certificates?.map((c, index) => ({
+          id: c.id || `cert-${Date.now()}-${index}`,
+          name: c.name || "",
+          certificateNo: c.certificateNo || "",
+          number: c.number || c.certificateNo || "", // Ensure "number" is present
+          placeIssued: c.placeIssued || "",
+          trainingCenter: c.trainingCenter || "",
+          dateIssued: c.dateIssued || "",
+          validUntil: c.validUntil || "",
+          expiryDate: c.expiryDate || "",
+          referenceNo: c.referenceNo || "",
+        })) || [],
 
-        documents:
-          crew.documents?.map((d, index) => ({
-            id: d.id || `doc-${Date.now()}-${index}`,
-            name: d.name || "",
-            placeIssued: d.placeIssued || "",
-            dateIssued: d.dateIssued || "",
-            expiryDate: d.expiryDate || "",
-          })) || prev.documents,
+      // Documents
+      documents:
+        crew.documents?.map((d, index) => ({
+          id: d.id || `doc-${Date.now()}-${index}`,
+          name: d.name || "",
+          placeIssued: d.placeIssued || "",
+          dateIssued: d.dateIssued || "",
+          expiryDate: d.expiryDate || "",
+        })) || prev.documents,
 
-        highSchool: crew.highSchool || prev.highSchool,
-        college: crew.college || prev.college,
-        medical: crew.medical || prev.medical,
-        seaService: crew.seaService || prev.seaService,
-      }));
-    }
-  }, [mode, crew]);
+      // Other nested objects
+      highSchool: crew.highSchool || prev.highSchool,
+      college: crew.college || prev.college,
+      medical: crew.medical || prev.medical,
+      medicals: crew.medicals || prev.medicals,
+      seaService: crew.seaService || prev.seaService,
+    }));
+  }
+}, [mode, crew]);
+
 
   const calculateAge = (dob: string) => {
     if (!dob) return "";
@@ -203,9 +223,7 @@ export function CrewApplicationForm({
   };
 
   const handleInputChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
 
@@ -243,7 +261,8 @@ export function CrewApplicationForm({
           trainingCenter: "",
           dateIssued: "",
           validUntil: "",
-        },
+          referenceNo: "",
+        } as any,
       ],
     }));
   };
@@ -255,11 +274,7 @@ export function CrewApplicationForm({
     }));
   };
 
-  const updateCertificate = (
-    id: string,
-    field: keyof Certificate,
-    value: string
-  ) => {
+  const updateCertificate = (id: string, field: keyof Certificate, value: string) => {
     setFormData((prev) => ({
       ...prev,
       certificates: prev.certificates.map((c) =>
@@ -351,7 +366,6 @@ export function CrewApplicationForm({
     }));
   };
 
-  // Sort Vessel Experience by signedOn DESC before saving
   const sortVesselExperienceLatestFirst = (vessels: VesselExperience[]) => {
     return [...vessels].sort((a, b) => {
       const aDate = a.signedOn ? new Date(a.signedOn).getTime() : 0;
@@ -367,12 +381,13 @@ export function CrewApplicationForm({
       formData.vesselExperience
     );
 
-    const payload = {
+    const payload: CrewMember = {
       ...formData,
       vesselExperience: sortedVesselExperience,
       age: Number(formData.age),
-      createdAt: serverTimestamp(),
-    };
+      createdAt: serverTimestamp() as any,
+      medicals: [formData.medical],
+    } as CrewMember;
 
     try {
       if (mode === "edit" && crew?.id) {
@@ -764,6 +779,51 @@ export function CrewApplicationForm({
                   </button>
                 </div>
               ))}
+            </div>
+          </section>
+
+          {/* MEDICAL CERTIFICATE */}
+          <section className="border border-[#E0E8F0] rounded-xl p-6 bg-[#F9FBFD]">
+            <h3 className="text-lg font-bold text-[#0080C0] mb-5">
+              Medical Certificate
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <input
+                name="medical.certificateType"
+                value={formData.medical.certificateType}
+                onChange={handleInputChange}
+                className={inputStyle}
+                placeholder="Certificate Type (e.g. PEME, Seafarer Medical)"
+                required
+              />
+
+              <input
+                name="medical.issuingClinic"
+                value={formData.medical.issuingClinic}
+                onChange={handleInputChange}
+                className={inputStyle}
+                placeholder="Issuing Clinic / Hospital"
+                required
+              />
+
+              <input
+                type="date"
+                name="medical.dateIssued"
+                value={formData.medical.dateIssued}
+                onChange={handleInputChange}
+                className={inputStyle}
+                required
+              />
+
+              <input
+                type="date"
+                name="medical.expiryDate"
+                value={formData.medical.expiryDate}
+                onChange={handleInputChange}
+                className={inputStyle}
+                required
+              />
             </div>
           </section>
 

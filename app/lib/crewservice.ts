@@ -132,7 +132,8 @@ export async function getCrewApplications(): Promise<CrewMember[]> {
       status: docData.status ?? "pending",
       remarks: docData.remarks ?? "",
       vesselName: "",
-      principal: ""
+      principal: "",
+      medicals: undefined
     };
 
     return crewMember;
@@ -203,7 +204,8 @@ export function listenCrewApplications(callback: (data: CrewMember[]) => void) {
         status: docData.status ?? "pending",
         remarks: docData.remarks ?? "",
         vesselName: "",
-        principal: ""
+        principal: "",
+        medicals: undefined
       };
 
       return crewMember;

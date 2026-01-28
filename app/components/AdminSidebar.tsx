@@ -17,7 +17,7 @@ export function AdminSidebar() {
   const menuItems = [
     { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/admin/crew-applications", label: "Crew Applications", icon: Users },
-    { href: "/admin/disapproved-crew", label: "Disapproved Crew", icon: XCircle },
+    { href: "/admin/crew-documentation", label: "Crew Documentation", icon: XCircle },
   ];
 
   const handleLogout = () => {
